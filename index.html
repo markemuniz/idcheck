@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TTA ID Check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --cover:#16233F; --cover-2:#1F2F52; --cover-3:#2A3D66; --cover-line:#34486F;
+  --on-cover:#E8EDF5; --on-cover-muted:#A6B4CC;
+  --paper:#EEF2F5; --ink:#18213A; --muted:#56627A; --rule:#CBD3DE;
+  --clear:#157A3D; --clear-tint:#E1F1E6;
+  --deny:#BD2530;  --deny-tint:#F8E2E3;
+  --check:#9E5B00; --check-tint:#F8EDDB;
+  --focus:#8AB8FF;
+  --display:'Big Shoulders Display','Roboto Condensed','Helvetica Neue Condensed','Arial Narrow',sans-serif;
+  --ui:'Public Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  /* report charts (validated: categorical slots 1-4 on #F7F9FB) */
+  --surface:#F7F9FB; --grid:#E3E8EE; --axis:#C3CCD8;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s1-strong:#1c5cab;
+  --ink-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' seed='11'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.1 2.15'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{height:100%}
+body{margin:0;min-height:100%;background:var(--cover);color:var(--on-cover);font-family:var(--ui);font-size:16px;line-height:1.45;
+  display:grid;grid-template-rows:auto auto 1fr auto;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+
+/* ---------- top bar ---------- */
+.bar{display:flex;align-items:center;gap:22px;padding:14px 24px;flex-wrap:wrap}
+.brand{margin:0;font-family:var(--display);font-weight:900;font-size:30px;line-height:1;letter-spacing:.01em}
+.brand-store{font-family:var(--ui);font-weight:500;font-size:15px;color:var(--on-cover-muted);margin-left:10px;letter-spacing:0}
+.tabs{display:flex;gap:4px}
+.tab{color:var(--on-cover-muted);text-decoration:none;font-weight:600;padding:6px 12px;border-radius:6px}
+.tab[aria-current="page"]{color:var(--on-cover);background:var(--cover-2)}
+.status{margin-left:auto;display:flex;align-items:center;gap:9px;font-size:15px;font-weight:600;padding:7px 14px;border-radius:999px;background:var(--cover-2);border:0}
+.dot{width:10px;height:10px;border-radius:50%;background:#43D18E}
+.status[data-s="ready"] .dot{animation:pulse 2.6s ease-out infinite}
+.status[data-s="reading"] .dot{background:var(--focus)}
+.status[data-s="blur"]{background:var(--deny);color:#fff}
+.status[data-s="blur"] .dot{background:#fff}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(67,209,142,.55)}70%{box-shadow:0 0 0 9px rgba(67,209,142,0)}100%{box-shadow:0 0 0 0 rgba(67,209,142,0)}}
+.focusbar{margin:0 24px 14px;padding:12px 16px;border-radius:8px;background:var(--deny);color:#fff;font-weight:600}
+.warnbar{margin:0 24px 14px;padding:12px 16px;border-radius:8px;background:var(--check-tint);color:var(--ink);font-weight:500}
+.warnbar button{margin-left:8px}
+
+/* ---------- scan view ---------- */
+.desk{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,1fr);gap:20px;padding:0 24px 18px;min-height:0}
+.page{position:relative;background:var(--paper);color:var(--ink);border-radius:10px;padding:40px 44px 48px;overflow:hidden;min-height:460px;
+  display:flex;flex-direction:column;justify-content:center;color-scheme:light;transition:background-color .2s;container-type:inline-size}
+.page::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-radial-gradient(circle at 108% -12%,transparent 0 17px,rgba(24,33,58,.045) 17px 18px)}
+.page>*{position:relative}
+.page[data-state="clear"]{background:var(--clear-tint);--stamp:var(--clear);--stamp-bg:var(--clear-tint)}
+.page[data-state="deny"]{background:var(--deny-tint);--stamp:var(--deny);--stamp-bg:var(--deny-tint)}
+.page[data-state="check"]{background:var(--check-tint);--stamp:var(--check);--stamp-bg:var(--check-tint)}
+
+.idle{max-width:560px}
+.barcode{width:min(360px,100%);height:auto;display:block;margin-bottom:30px;opacity:.9}
+.idle-title{font-family:var(--display);font-weight:900;font-size:clamp(44px,5.4vw,72px);line-height:.95;margin:0 0 14px;letter-spacing:.005em}
+.idle-sub{font-size:19px;margin:0 0 22px;color:var(--ink);max-width:38ch}
+.idle-note{margin:0;color:var(--muted);max-width:52ch}
+
+.stamp{align-self:flex-start;display:inline-flex;flex-direction:column;align-items:center;gap:.07em;padding:.14em .4em .2em;
+  color:var(--stamp);border:.07em solid currentColor;border-radius:.14em;
+  box-shadow:inset 0 0 0 .035em var(--stamp-bg),inset 0 0 0 .065em currentColor;
+  font-family:var(--display);font-weight:900;font-size:clamp(52px,15cqi,150px);line-height:.86;letter-spacing:.015em;white-space:nowrap;max-width:100%;
+  transform:rotate(-3deg);transform-origin:20% 60%;
+  -webkit-mask-image:var(--ink-mask);mask-image:var(--ink-mask);-webkit-mask-size:240px 240px;mask-size:240px 240px}
+.s-sub{font-size:.28em;font-weight:800;letter-spacing:.07em;line-height:1}
+.page.stamped .stamp{animation:thunk .3s cubic-bezier(.2,.9,.3,1.25) both}
+@keyframes thunk{from{opacity:0;transform:rotate(-3deg) scale(1.45)}to{opacity:1;transform:rotate(-3deg) scale(1)}}
+.r-head{font-family:var(--display);font-weight:800;font-size:clamp(30px,3.3vw,44px);line-height:1;margin:34px 0 8px}
+.r-reason{font-size:19px;margin:0;max-width:46ch}
+.flags{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:8px;max-width:60ch}
+.flags li{padding:8px 12px;border-left:4px solid var(--check);background:rgba(255,255,255,.6);border-radius:0 6px 6px 0;font-size:15px}
+.flags li.stop{border-left-color:var(--deny);font-weight:600}
+.match{margin-top:24px}
+.match p{margin:0 0 6px;font-weight:600}
+.match ul{margin:0;padding-left:20px;color:var(--ink)}
+.match li{margin:2px 0}
+.r-foot{display:flex;align-items:center;gap:14px;margin-top:26px;flex-wrap:wrap}
+.r-note{color:var(--muted);font-size:14px}
+.drain{position:absolute;left:0;right:0;bottom:0;height:6px}
+.drain span{display:block;height:100%;width:100%;background:var(--stamp,var(--muted));opacity:.55;transform-origin:left}
+@keyframes drain{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+
+.details{background:var(--cover-2);border-radius:10px;padding:26px 28px;min-width:0;overflow:auto}
+.d-title{font-size:15px;font-weight:600;color:var(--on-cover-muted);margin:0 0 8px}
+.d-empty{margin:0;color:var(--on-cover-muted);max-width:36ch}
+.d-name{font-family:var(--display);font-weight:800;font-size:clamp(30px,3vw,42px);line-height:1;margin:0 0 20px;color:#fff;overflow-wrap:anywhere}
+.facts{display:grid;grid-template-columns:max-content 1fr;margin:0}
+.facts dt,.facts dd{border-top:1px solid var(--cover-line);padding:11px 0}
+.facts dt{color:var(--on-cover-muted);font-size:14px;padding-right:20px;padding-top:14px}
+.facts dd{margin:0;font-weight:600;font-size:18px;font-variant-numeric:tabular-nums}
+.facts .sub{display:block;font-weight:400;font-size:14px;color:var(--on-cover-muted)}
+.raw{margin-top:22px}
+.raw h3{font-size:14px;font-weight:600;color:var(--on-cover-muted);margin:0 0 6px}
+.raw pre{margin:0;white-space:pre-wrap;word-break:break-all;font-size:12px;line-height:1.5;background:var(--cover);padding:10px;border-radius:6px;max-height:260px;overflow:auto}
+.raw .cc{color:#F5B971}
+
+.foot{display:flex;align-items:center;gap:14px 24px;padding:12px 24px 20px;flex-wrap:wrap}
+.tally{display:flex;gap:22px;margin:0;align-items:baseline;flex-wrap:wrap}
+.tally b{font-family:var(--display);font-size:30px;font-weight:800;margin-right:6px;font-variant-numeric:tabular-nums}
+.t-where,.cloud{color:var(--on-cover-muted);font-size:14px}
+.cloud[data-s="error"]{color:#FFB4B4}
+.foot-actions{margin-left:auto;display:flex;gap:10px}
+
+/* ---------- buttons & forms ---------- */
+.btn{background:var(--on-cover);color:var(--cover);border:0;border-radius:8px;padding:10px 18px;font-weight:700}
+.btn.ghost{background:transparent;color:var(--on-cover);box-shadow:inset 0 0 0 1px var(--cover-line)}
+.btn-ink{background:var(--cover);color:#fff;border:0;border-radius:8px;padding:10px 18px;font-weight:700}
+.btn-ink.small{padding:7px 12px;font-size:14px}
+.btn-plain{background:#fff;color:var(--ink);border:1px solid var(--rule);border-radius:8px;padding:9px 16px;font-weight:600}
+.btn-plain.danger{color:var(--deny)}
+.linkish{background:none;border:0;padding:0;color:inherit;text-decoration:underline;text-underline-offset:3px;font-weight:600}
+
+dialog{border:0;border-radius:12px;padding:0;background:var(--paper);color:var(--ink);width:min(560px,94vw);color-scheme:light;max-height:92vh}
+dialog.wide{width:min(720px,94vw)}
+dialog::backdrop{background:rgba(9,15,30,.62)}
+.dlg{padding:26px 28px 24px}
+.dlg h2{font-family:var(--display);font-weight:900;font-size:34px;line-height:1;margin:0 0 8px}
+.dlg h3{font-size:16px;margin:0 0 10px}
+.dlg section{padding:18px 0;border-top:1px solid var(--rule)}
+.dlg section:first-of-type{border-top:0;padding-top:6px}
+.dlg-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:8px}
+.dlg-sub,.hint{color:var(--muted);margin:0 0 14px;font-size:15px}
+.dlg label{display:block;font-weight:600;font-size:14px;margin-bottom:12px}
+.dlg input:not([type=checkbox]):not([type=radio]),.dlg select,.dlg textarea{display:block;width:100%;margin-top:6px;padding:10px 12px;border:1px solid var(--rule);border-radius:8px;background:#fff;font-weight:500;font-size:16px}
+.dlg label.check{display:flex;align-items:center;gap:10px;font-weight:500;font-size:15px}
+.dlg label.check input{width:18px;height:18px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.dlg-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
+.err{color:var(--deny);font-weight:600;min-height:1.4em;margin:0 0 6px;font-size:15px}
+.samples{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.samples button{background:#fff;border:1px solid var(--rule);border-radius:999px;padding:6px 12px;font-size:14px;font-weight:500}
+.storepick{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.storepick label{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--rule);border-radius:8px;padding:12px 14px;margin:0;font-size:16px}
+.storepick label:has(input:checked){border-color:var(--cover);box-shadow:inset 0 0 0 1px var(--cover)}
+
+/* ---------- reports ---------- */
+.reports{padding:0 24px 28px;display:flex;flex-direction:column;gap:18px;min-width:0}
+.r-gate{background:var(--cover-2);border-radius:10px;padding:28px;max-width:640px}
+.r-gate h2{font-family:var(--display);font-weight:900;font-size:36px;line-height:1;margin:0 0 10px}
+.r-gate p{margin:0 0 16px;color:var(--on-cover-muted)}
+.r-controls{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center}
+.seg{display:inline-flex;background:var(--cover-2);border-radius:8px;padding:3px}
+.seg button{border:0;background:transparent;color:var(--on-cover);padding:7px 12px;border-radius:6px;font-weight:600;font-size:15px}
+.seg button[aria-pressed="true"]{background:var(--on-cover);color:var(--cover)}
+.r-store{display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px}
+.r-store select{background:var(--cover-2);border:1px solid var(--cover-line);border-radius:8px;padding:7px 10px;color:var(--on-cover)}
+.r-user{margin-left:auto;color:var(--on-cover-muted);font-size:14px}
+#rBody{display:flex;flex-direction:column;gap:18px}
+.r-range{margin:-6px 0 0;color:var(--on-cover-muted);font-size:15px}
+.rpanel{background:var(--surface);color:var(--ink);border-radius:10px;padding:20px 22px;color-scheme:light;min-width:0}
+.rpanel h2{font-size:17px;font-weight:700;margin:0 0 2px}
+.rp-sub{margin:0 0 12px;color:var(--muted);font-size:14px}
+.rp-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+.rgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.tablewrap{overflow-x:auto}
+.rtable{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:15px}
+.rtable th{text-align:left;font-weight:600;color:var(--muted);font-size:13px;padding:8px 10px;border-bottom:1px solid var(--rule);white-space:nowrap}
+.rtable td{padding:9px 10px;border-bottom:1px solid var(--grid);white-space:nowrap}
+.rtable .num{text-align:right}
+.rtable tr.total td{font-weight:700;border-bottom:0}
+.rtable .swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:8px;vertical-align:-1px}
+.empty{color:var(--muted);margin:8px 0;font-size:15px}
+.chart{position:relative;min-height:60px}
+.chart svg{display:block;overflow:visible}
+.chart text{font-family:var(--ui);font-size:12px;fill:var(--muted)}
+.chart .dl{font-size:12px;font-weight:600;fill:var(--ink)}
+.tip{position:absolute;z-index:2;pointer-events:none;background:var(--ink);color:#fff;font-size:13px;line-height:1.4;padding:7px 10px;border-radius:6px;white-space:nowrap;
+  transform:translate(-50%,calc(-100% - 12px));opacity:0;transition:opacity .08s}
+.tip.on{opacity:1}
+.tip i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+.legend{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin:4px 0 10px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px}
+.hbar{display:grid;grid-template-columns:minmax(110px,170px) 1fr 70px;align-items:center;gap:12px;font-size:14px;padding:5px 0}
+.hbar .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hbar .fill{height:10px;background:var(--s1);border-radius:0 4px 4px 0;min-width:2px}
+.hbar .v{text-align:right;font-variant-numeric:tabular-nums}
+.hbar .v small{color:var(--muted);margin-left:4px}
+details.numbers{margin-top:8px}
+details.numbers summary{cursor:pointer;color:var(--muted);font-size:13px}
+details.numbers table{margin-top:8px}
+
+@media (max-width:900px){
+  .desk{grid-template-columns:1fr}
+  .rgrid{grid-template-columns:1fr}
+  .page{min-height:380px;padding:30px 26px 40px}
+}
+@media (max-width:560px){ .two,.storepick{grid-template-columns:1fr} .foot-actions{margin-left:0} }
+@media (prefers-reduced-motion:reduce){
+  .page.stamped .stamp{animation:none}
+  .status .dot{animation:none!important}
+  .drain span{animation:none!important;opacity:0}
+}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <h1 class="brand">ID Check<span class="brand-store" id="brandStore"></span></h1>
+  <nav class="tabs" aria-label="Views">
+    <a href="#" class="tab" id="tabScan" aria-current="page">Scan</a>
+    <a href="#reports" class="tab" id="tabReports">Reports</a>
+  </nav>
+  <div class="status" id="status" data-s="ready" role="status"><span class="dot"></span><span id="statusText">Ready to scan</span></div>
+</header>
+
+<div id="banners">
+  <p class="focusbar" id="focusbar" hidden>The scanner can't type into this page right now. Click anywhere on this page to turn it back on.</p>
+  <p class="warnbar" id="nostore" hidden>This computer isn't assigned to a store yet, so scans aren't being saved.<button class="btn-ink small" data-open="setup">Pick a store</button></p>
+</div>
+
+<main id="viewScan" class="desk">
+  <section class="page" id="page" data-state="idle" aria-live="assertive">
+    <div class="idle" id="idle">
+      <svg class="barcode" id="barcodeArt" viewBox="0 0 360 92" aria-hidden="true"></svg>
+      <h2 class="idle-title">Scan the back of the ID</h2>
+      <p class="idle-sub">Aim the scanner at the wide barcode on the back of the license or state ID.</p>
+      <p class="idle-note">No barcode, or it won't scan? Passports, military IDs, IDNYC and consular IDs go through <button class="linkish" data-open="manual">Manual check</button>.</p>
+    </div>
+    <div class="result" id="result" hidden>
+      <div class="stamp" id="stamp"><span id="sMain"></span><span class="s-sub" id="sSub"></span></div>
+      <p class="r-head" id="rHead"></p>
+      <p class="r-reason" id="rReason"></p>
+      <ul class="flags" id="flags"></ul>
+      <div class="match" id="match">
+        <p>Before you sell, match the card to the customer:</p>
+        <ul><li>Face matches the photo</li><li>Name and birth date match what's printed</li><li>Card isn't cracked, peeled or reprinted</li></ul>
+      </div>
+      <div class="r-foot"><button class="btn-ink" id="clearNow">Clear screen</button><span class="r-note" id="rNote"></span></div>
+    </div>
+    <div class="drain" aria-hidden="true"><span id="drain"></span></div>
+  </section>
+
+  <aside class="details" aria-label="Customer details">
+    <div id="detIdle">
+      <h2 class="d-title">Customer details</h2>
+      <p class="d-empty">Details show here after a scan, then clear on their own so customer info doesn't stay on screen. Names, birth dates and ID numbers are never saved.</p>
+    </div>
+    <div id="detFull" hidden>
+      <p class="d-name" id="dName"></p>
+      <dl class="facts" id="facts"></dl>
+    </div>
+    <div class="raw" id="rawBox" hidden>
+      <h3>Raw scan (not saved)</h3>
+      <pre id="rawText"></pre>
+    </div>
+  </aside>
+</main>
+
+<section id="viewReports" class="reports" hidden>
+  <div class="r-gate" id="rGate">
+    <h2 id="gTitle">Reports</h2>
+    <p id="gText"></p>
+    <button class="btn" id="gSignIn" hidden>Sign in with Google</button>
+    <button class="btn ghost" id="gSignOut" hidden>Sign out</button>
+  </div>
+  <div id="rBody" hidden>
+    <div class="r-controls">
+      <div class="seg" role="group" aria-label="Date range">
+        <button data-range="today" aria-pressed="true">Today</button>
+        <button data-range="7" aria-pressed="false">Last 7 days</button>
+        <button data-range="30" aria-pressed="false">Last 30 days</button>
+        <button data-range="month" aria-pressed="false">This month</button>
+      </div>
+      <label class="r-store">Store <select id="rStore"><option value="all">All stores</option></select></label>
+      <span class="r-user"><span id="rUser"></span> <button class="linkish" id="rSignOut">Sign out</button></span>
+    </div>
+    <p class="r-range" id="rRange"></p>
+    <div class="rpanel">
+      <div class="rp-head"><h2>By store</h2><button class="btn-ink small" id="rCsv">Download daily CSV</button></div>
+      <div class="tablewrap"><table class="rtable" id="tStores"></table></div>
+    </div>
+    <div class="rgrid">
+      <div class="rpanel" id="pDays"><h2>Scans per day</h2><p class="rp-sub">Every scan and manual check</p><div id="lDays"></div><div class="chart" id="cDays"></div><details class="numbers"><summary>Show numbers</summary><div class="tablewrap"><table class="rtable" id="nDays"></table></div></details></div>
+      <div class="rpanel"><h2>Busiest hours</h2><p class="rp-sub">Scans by hour of day, all days in range</p><div class="chart" id="cHours"></div><details class="numbers"><summary>Show numbers</summary><div class="tablewrap"><table class="rtable" id="nHours"></table></div></details></div>
+      <div class="rpanel"><h2>Where IDs are from</h2><p class="rp-sub">Issuing state or province</p><div id="cIssuers"></div></div>
+      <div class="rpanel"><h2>Customer ages</h2><p class="rp-sub">Age at time of scan</p><div class="chart" id="cAges"></div><details class="numbers"><summary>Show numbers</summary><div class="tablewrap"><table class="rtable" id="nAges"></table></div></details></div>
+    </div>
+    <div class="rpanel">
+      <h2>Denials</h2><p class="rp-sub">Newest first. Only age, reason and issuing state are kept.</p>
+      <div class="tablewrap"><table class="rtable" id="tDenials"></table></div>
+      <button class="btn-plain" id="denMore" style="margin-top:12px" hidden></button>
+    </div>
+  </div>
+</section>
+
+<footer class="foot" id="foot">
+  <p class="tally"><span><b id="tClear">0</b>cleared</span><span><b id="tDeny">0</b>denied</span><span><b id="tCheck">0</b>flagged</span><span class="t-where">on this computer today</span></p>
+  <span class="cloud" id="cloud" data-s="off"></span>
+  <div class="foot-actions"><button class="btn" data-open="manual">Manual check</button><button class="btn ghost" data-open="settings">Settings</button></div>
+</footer>
+
+<!-- Manual check -->
+<dialog id="dlgManual" aria-labelledby="mTitle">
+  <form class="dlg" id="manualForm" novalidate>
+    <h2 id="mTitle">Manual check</h2>
+    <p class="dlg-sub">For IDs without a scannable barcode. Type the dates exactly as printed on the ID.</p>
+    <label>Type of ID
+      <select id="mType">
+        <option value="passport">Passport</option>
+        <option value="military">Military ID</option>
+        <option value="idnyc">IDNYC</option>
+        <option value="consular">Consular ID</option>
+        <option value="noscan">License or state ID that won't scan</option>
+        <option value="other">Other government photo ID</option>
+      </select>
+    </label>
+    <div class="two">
+      <label>Date of birth <input id="mDob" inputmode="numeric" placeholder="MM/DD/YYYY" autocomplete="off" maxlength="10"></label>
+      <label>Expiration date <input id="mExp" inputmode="numeric" placeholder="MM/DD/YYYY" autocomplete="off" maxlength="10"></label>
+    </div>
+    <p class="err" id="mErr" role="alert"></p>
+    <div class="dlg-actions"><button type="button" class="btn-plain" data-close>Cancel</button><button type="submit" class="btn-ink">Check age</button></div>
+  </form>
+</dialog>
+
+<!-- First-run setup -->
+<dialog id="dlgSetup" aria-labelledby="suTitle">
+  <form class="dlg" id="setupForm" novalidate>
+    <h2 id="suTitle">Set up this computer</h2>
+    <p class="dlg-sub">Pick the store this scanner is in. Every scan is counted under this store.</p>
+    <div class="storepick" id="suStores"></div>
+    <label>Station name <input id="suStation" maxlength="40" placeholder="Front door"></label>
+    <p class="err" id="suErr" role="alert"></p>
+    <div class="dlg-actions"><button type="submit" class="btn-ink">Save</button></div>
+  </form>
+</dialog>
+
+<!-- Settings -->
+<dialog id="dlgSettings" class="wide" aria-labelledby="stTitle">
+  <div class="dlg">
+    <div class="dlg-head"><h2 id="stTitle">Settings</h2><button class="btn-plain" data-close>Done</button></div>
+    <section>
+      <h3>This computer</h3>
+      <div class="two">
+        <label>Store <select id="setStore"><option value="">Not set</option></select></label>
+        <label>Station name <input id="setStation" maxlength="40" placeholder="Front door"></label>
+      </div>
+      <p class="hint" id="cloudLine"></p>
+    </section>
+    <section>
+      <h3>Rules</h3>
+      <div class="two">
+        <label>Minimum age <input id="setAge" type="number" min="18" max="25"></label>
+        <label>Clear the screen after
+          <select id="setClear"><option value="10">10 seconds</option><option value="15">15 seconds</option><option value="20">20 seconds</option><option value="30">30 seconds</option><option value="60">1 minute</option><option value="0">Never</option></select>
+        </label>
+      </div>
+      <label class="check"><input type="checkbox" id="setSound"> Play a sound for each result</label>
+    </section>
+    <section>
+      <h3>Scanner setup</h3>
+      <p class="hint">The scanner has to be a 2D imager that reads PDF417, the wide barcode on the back of licenses. It types like a keyboard, so this page must stay open and clicked.</p>
+      <label class="check"><input type="checkbox" id="setRaw"> Show the raw scan next to results (for troubleshooting)</label>
+      <p class="hint">Try a sample ID. Samples aren't counted or saved.</p>
+      <div class="samples" id="samples"></div>
+      <label>Or paste scan text to test it <textarea id="pasteBox" rows="3"></textarea></label>
+      <button class="btn-plain" id="pasteGo">Check pasted text</button>
+    </section>
+    <section>
+      <h3>On-screen count</h3>
+      <p class="hint">Resets the count shown at the bottom of this computer. Saved reports aren't affected.</p>
+      <button class="btn-plain danger" id="resetTally">Reset today's count</button>
+    </section>
+  </div>
+</dialog>
+
+<script>
+/*CORE-START*/
+var IDCore = (function () {
+  'use strict';
+  // AAMVA Issuer Identification Numbers (aamva.org IIN list)
+  var IIN = {
+    '604426':['Prince Edward Island','PE','CAN'],'604427':['American Samoa','AS','USA'],'604428':['Quebec','QC','CAN'],
+    '604429':['Yukon','YT','CAN'],'604430':['Northern Mariana Islands','MP','USA'],'604431':['Puerto Rico','PR','USA'],
+    '604432':['Alberta','AB','CAN'],'604433':['Nunavut','NU','CAN'],'604434':['Northwest Territories','NT','CAN'],
+    '636000':['Virginia','VA','USA'],'636001':['New York','NY','USA'],'636002':['Massachusetts','MA','USA'],
+    '636003':['Maryland','MD','USA'],'636004':['North Carolina','NC','USA'],'636005':['South Carolina','SC','USA'],
+    '636006':['Connecticut','CT','USA'],'636007':['Louisiana','LA','USA'],'636008':['Montana','MT','USA'],
+    '636009':['New Mexico','NM','USA'],'636010':['Florida','FL','USA'],'636011':['Delaware','DE','USA'],
+    '636012':['Ontario','ON','CAN'],'636013':['Nova Scotia','NS','CAN'],'636014':['California','CA','USA'],
+    '636015':['Texas','TX','USA'],'636016':['Newfoundland and Labrador','NL','CAN'],'636017':['New Brunswick','NB','CAN'],
+    '636018':['Iowa','IA','USA'],'636019':['Guam','GU','USA'],'636020':['Colorado','CO','USA'],
+    '636021':['Arkansas','AR','USA'],'636022':['Kansas','KS','USA'],'636023':['Ohio','OH','USA'],
+    '636024':['Vermont','VT','USA'],'636025':['Pennsylvania','PA','USA'],'636026':['Arizona','AZ','USA'],
+    '636027':['U.S. State Department','US','USA'],'636028':['British Columbia','BC','CAN'],'636029':['Oregon','OR','USA'],
+    '636030':['Missouri','MO','USA'],'636031':['Wisconsin','WI','USA'],'636032':['Michigan','MI','USA'],
+    '636033':['Alabama','AL','USA'],'636034':['North Dakota','ND','USA'],'636035':['Illinois','IL','USA'],
+    '636036':['New Jersey','NJ','USA'],'636037':['Indiana','IN','USA'],'636038':['Minnesota','MN','USA'],
+    '636039':['New Hampshire','NH','USA'],'636040':['Utah','UT','USA'],'636041':['Maine','ME','USA'],
+    '636042':['South Dakota','SD','USA'],'636043':['District of Columbia','DC','USA'],'636044':['Saskatchewan','SK','CAN'],
+    '636045':['Washington','WA','USA'],'636046':['Kentucky','KY','USA'],'636047':['Hawaii','HI','USA'],
+    '636048':['Manitoba','MB','CAN'],'636049':['Nevada','NV','USA'],'636050':['Idaho','ID','USA'],
+    '636051':['Mississippi','MS','USA'],'636052':['Rhode Island','RI','USA'],'636053':['Tennessee','TN','USA'],
+    '636054':['Nebraska','NE','USA'],'636055':['Georgia','GA','USA'],'636056':['Coahuila','CU','MEX'],
+    '636057':['Hidalgo','HL','MEX'],'636058':['Oklahoma','OK','USA'],'636059':['Alaska','AK','USA'],
+    '636060':['Wyoming','WY','USA'],'636061':['West Virginia','WV','USA'],'636062':['U.S. Virgin Islands','VI','USA']
+  };
+  var BY_ABBR = {}; Object.keys(IIN).forEach(function (k) { BY_ABBR[IIN[k][1]] = IIN[k][0]; });
+  var ALIAS = { NF: 'NL', GM: 'CO', PQ: 'QC' };
+  var CODES = new Set(('DAA DAB DAC DAD DAE DAF DAG DAH DAI DAJ DAK DAL DAM DAN DAO DAP DAQ DAR DAS DAT DAU DAV DAW DAX DAY DAZ ' +
+    'DBA DBB DBC DBD DBE DBF DBG DBH DBI DBJ DBK DBL DBM DBN DBO DBP DBQ DBR DBS ' +
+    'DCA DCB DCD DCE DCF DCG DCH DCI DCJ DCK DCL DCM DCN DCO DCP DCQ DCR DCS DCT DCU ' +
+    'DDA DDB DDC DDD DDE DDF DDG DDH DDI DDJ DDK DDL PAA PAB PAC PAD PAE PAF').split(' '));
+  var FALLBACK = ('DCA DCB DCD DBA DCS DAC DAD DBD DBB DBC DAY DAU DAG DAH DAI DAJ DAK DAQ DCF DCG DDE DDF DDG DAZ DCI DCJ DCK ' +
+    'DBN DBG DBS DCU DCE DCL DDA DDB DDC DDD DAW DAX DDH DDI DDJ DDK DDL DAA DAB DCT').split(' ');
+  var EYES = { BLK:'Black', BLU:'Blue', BRO:'Brown', GRY:'Gray', GRN:'Green', HAZ:'Hazel', MAR:'Maroon', PNK:'Pink', DIC:'Two-color', UNK:'' };
+
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function pad4(n) { return String(n).padStart(4, '0'); }
+  function normalize(raw) { return String(raw == null ? '' : raw).replace(/\r\n/g, '\n').replace(/[\r\x1e\x1d\x1c\t]/g, '\n'); }
+  function clean(v) { if (v == null) return ''; v = String(v).trim(); return /^(NONE|UNAVL|UNAVAILABLE|N\/A|UNK)$/i.test(v) ? '' : v; }
+  function normJur(a) { a = String(a || '').toUpperCase(); return ALIAS[a] || a; }
+  function startOfDay(d) { var x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+  function addYears(d, n) { return new Date(d.getFullYear() + n, d.getMonth(), d.getDate()); }
+  function ageOn(dob, t) {
+    var a = t.getFullYear() - dob.getFullYear();
+    var md = (t.getMonth() - dob.getMonth()) || (t.getDate() - dob.getDate());
+    if (md < 0) a--;
+    return a;
+  }
+  function daysBetween(a, b) { return Math.round((startOfDay(b) - startOfDay(a)) / 86400000); }
+  function fmt(d) { return d ? pad2(d.getMonth() + 1) + '/' + pad2(d.getDate()) + '/' + d.getFullYear() : ''; }
+  function hash(s) { var h = 2166136261; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
+
+  // AAMVA dates: US cards use MMDDCCYY, Canada and the 2000 standard use CCYYMMDD.
+  // The two layouts can never both produce a real date, so try both.
+  function parseDate(s, country) {
+    var d = String(s || '').replace(/\D/g, '');
+    if (d.length !== 8) return null;
+    var a = { y: +d.slice(0, 4), m: +d.slice(4, 6), d: +d.slice(6, 8) };
+    var b = { m: +d.slice(0, 2), d: +d.slice(2, 4), y: +d.slice(4, 8) };
+    function ok(o) { return o.y >= 1880 && o.y <= 2150 && o.m >= 1 && o.m <= 12 && o.d >= 1 && o.d <= new Date(o.y, o.m, 0).getDate(); }
+    var p = ok(a) && ok(b) ? (country === 'CAN' ? a : b) : ok(a) ? a : ok(b) ? b : null;
+    return p ? new Date(p.y, p.m - 1, p.d) : null;
+  }
+  function parseTyped(s) { // manual entry: MM/DD/YYYY, M/D/YYYY or MMDDYYYY
+    s = String(s || '').trim();
+    var m = /^(\d{1,2})\D(\d{1,2})\D(\d{4})$/.exec(s) || /^(\d{2})(\d{2})(\d{4})$/.exec(s);
+    if (!m) return null;
+    var y = +m[3], mo = +m[1], d = +m[2];
+    if (mo < 1 || mo > 12 || d < 1 || d > new Date(y, mo, 0).getDate() || y < 1880 || y > 2150) return null;
+    return new Date(y, mo - 1, d);
+  }
+  function height(s) {
+    if (!s) return '';
+    var f = /^(\d)\s*-\s*(\d{1,2})$/.exec(s); if (f) return f[1] + "'" + f[2] + '"';
+    var m = /(\d{2,3})\s*(IN|CM)?/i.exec(s); if (!m) return s;
+    var n = parseInt(m[1], 10);
+    if ((m[2] || '').toUpperCase() === 'CM') return n + ' cm';
+    if (n >= 36 && n <= 96) return Math.floor(n / 12) + "'" + (n % 12) + '"';
+    return s;
+  }
+  function nameOf(f) {
+    var last = clean(f.DCS) || clean(f.DAB), first = clean(f.DAC), middle = clean(f.DAD), suffix = clean(f.DCU) || clean(f.DAE);
+    var given = clean(f.DCT);
+    if (!first && given) { var g = given.split(/[,\s$]+/).filter(Boolean); first = g.shift() || ''; if (!middle) middle = g.join(' '); }
+    var full = clean(f.DAA), p;
+    if ((!last || !first) && full) {
+      if (/[,$]/.test(full)) {
+        p = full.split(/[,$]/).map(function (s) { return s.trim(); }).filter(Boolean);
+        last = last || p[0] || ''; first = first || p[1] || ''; middle = middle || p.slice(2).join(' ');
+      } else {
+        p = full.split(/\s+/); last = last || p.pop() || ''; first = first || p.shift() || ''; middle = middle || p.join(' ');
+      }
+    }
+    return { first: first, middle: middle, last: last, suffix: suffix };
+  }
+
+  function analyze(raw) {
+    var text = normalize(raw);
+    var r = { recognized: false, fields: {}, flags: [], fallback: false, version: null, iin: null, issuer: null };
+    var hm = /(?:ANSI|AAMVA) ?(\d{6})(\d{2})/.exec(text);
+    var pos = 0, designators = [], i;
+    if (hm) {
+      r.iin = hm[1]; r.version = parseInt(hm[2], 10);
+      pos = hm.index + hm[0].length;
+      if (r.version >= 2 && /^\d{2}/.test(text.substr(pos, 2))) { r.jurisVersion = text.substr(pos, 2); pos += 2; }
+      var n = parseInt(text.substr(pos, 2), 10);
+      if (!isNaN(n)) pos += 2;
+      for (i = 0; i < (n || 0) && i < 10; i++) {
+        var dm = /^([A-Z]{2})(\d{4})(\d{4})/.exec(text.slice(pos));
+        if (!dm) break;
+        designators.push(dm[1]); pos += 10;
+      }
+      var iss = IIN[r.iin];
+      if (iss) r.issuer = { name: iss[0], abbr: iss[1], country: iss[2] };
+    }
+
+    // Normal case: one data element per line.
+    var fields = {}, found = 0, prefix = null, lines = text.split('\n');
+    for (i = 0; i < lines.length; i++) {
+      var line = lines[i]; if (!line) continue;
+      var code = null, val = null, c3 = line.slice(0, 3);
+      if (CODES.has(c3)) { code = c3; val = line.slice(3); }
+      else {
+        var re = /(DL|ID|EN)([A-Z]{3})/g, m;
+        while ((m = re.exec(line))) {
+          if (CODES.has(m[2])) { code = m[2]; val = line.slice(m.index + 5); prefix = prefix || m[1]; break; }
+          re.lastIndex = m.index + 1;
+        }
+      }
+      if (code && !(code in fields)) { fields[code] = val.trim(); found++; }
+    }
+
+    // Scanner dropped the line breaks: split on element codes, read dates strictly.
+    if (found < 6) {
+      var body = text.slice(pos).replace(/\n/g, '');
+      var fre = new RegExp('(' + FALLBACK.join('|') + ')', 'g'), hits = [], fm;
+      while ((fm = fre.exec(body))) hits.push({ code: fm[1], at: fm.index });
+      if (hits.length >= 6) {
+        var f2 = {};
+        for (i = 0; i < hits.length; i++) {
+          var end = i + 1 < hits.length ? hits[i + 1].at : body.length;
+          if (!(hits[i].code in f2)) f2[hits[i].code] = body.slice(hits[i].at + 3, end).trim();
+        }
+        ['DBB', 'DBA', 'DBD', 'DDJ', 'DDH', 'DDI', 'DDB', 'DDC'].forEach(function (dc) {
+          var x = new RegExp(dc + '(\\d{8})').exec(body); if (x) f2[dc] = x[1]; else delete f2[dc];
+        });
+        var x1 = /DAJ([A-Z]{2})/.exec(body); if (x1) f2.DAJ = x1[1];
+        var x2 = /DCG(USA|CAN|MEX)/.exec(body); if (x2) f2.DCG = x2[1];
+        var x3 = /DBC([129MFX])/.exec(body); if (x3) f2.DBC = x3[1];
+        var x4 = /DDA([FN])/.exec(body); if (x4) f2.DDA = x4[1];
+        fields = f2; found = hits.length; r.fallback = true;
+        r.flags.push({ level: 'warn', code: 'fallback', text: "This scanner isn't sending line breaks, so names may be cut off. Dates still read correctly. See Settings, Scanner setup." });
+      }
+    }
+
+    var dtype = null;
+    for (i = 0; i < designators.length; i++) if (designators[i][0] !== 'Z') { dtype = designators[i]; break; }
+    dtype = dtype || prefix;
+    r.docCode = dtype || null;
+    r.docType = dtype === 'ID' ? 'ID card' : dtype === 'DL' ? 'Driver license' : null;
+    r.fields = fields; r.found = found;
+    r.recognized = hm ? found >= 3 : found >= 6;
+    var country = (clean(fields.DCG) || (r.issuer && r.issuer.country) || 'USA').toUpperCase();
+    r.country = country;
+    r.dob = parseDate(fields.DBB, country);
+    r.exp = parseDate(fields.DBA, country);
+    r.issued = parseDate(fields.DBD, country);
+    r.under21Until = parseDate(fields.DDJ, country);
+    r.name = nameOf(fields);
+    var sx = clean(fields.DBC).toUpperCase();
+    r.sex = sx === '1' || sx === 'M' ? 'Male' : sx === '2' || sx === 'F' ? 'Female' : sx === '9' || sx === 'X' ? 'X' : '';
+    r.eyes = EYES[clean(fields.DAY).toUpperCase()] || '';
+    r.height = height(clean(fields.DAU));
+    var idn = clean(fields.DAQ).replace(/\s/g, '');
+    r.idLast4 = idn ? idn.slice(-4) : '';
+    var dda = clean(fields.DDA).toUpperCase();
+    r.realId = dda === 'F' ? true : dda === 'N' ? false : null;
+    r.limited = clean(fields.DDD) === '1';
+    r.state = clean(fields.DAJ).toUpperCase();
+    r.cardKey = (idn || fields.DBB) ? hash((r.iin || '') + '|' + idn + '|' + (fields.DBB || '') + '|' + r.name.last) : null;
+
+    if (hm && !r.issuer) r.flags.push({ level: 'warn', code: 'iin_unknown', text: 'Unrecognized issuer code ' + r.iin + '.' });
+    if (!hm && r.recognized) r.flags.push({ level: 'warn', code: 'no_header', text: 'The barcode header is missing. Double-check the printed card.' });
+    if (r.version != null && r.version > 10) r.flags.push({ level: 'warn', code: 'version_new', text: 'Newer barcode version (' + r.version + '). Double-check the printed card.' });
+    if (r.issuer && r.state && r.issuer.abbr !== 'US' && normJur(r.state) !== normJur(r.issuer.abbr))
+      r.flags.push({ level: 'warn', code: 'iin_mismatch', text: 'The barcode was issued by ' + r.issuer.name + ', but the address state is ' + r.state + '.' });
+    if (r.recognized && ['USA', 'CAN', 'MEX'].indexOf(country) < 0) r.flags.push({ level: 'warn', code: 'country_other', text: 'Country code in the barcode is ' + country + '.' });
+    return r;
+  }
+
+  function verdict(r, opts) {
+    opts = opts || {};
+    var minAge = opts.minAge || 21, t = startOfDay(opts.today || new Date());
+    var v = { flags: r.flags.slice(), age: null };
+    function out(o) { for (var k in o) v[k] = o[k]; return v; }
+    if (!r.recognized) return out({ status: 'check', reason: 'unreadable', main: 'CHECK ID', sub: 'No ID data found',
+      head: "This isn't a license or state ID barcode", why: 'Passports, military IDs, IDNYC and consular IDs go through Manual check.' });
+    if (!r.dob) return out({ status: 'check', reason: 'no_dob', main: 'CHECK ID', sub: 'No birth date',
+      head: 'No birth date in the barcode', why: 'Check the birth date printed on the card, or use Manual check.' });
+    var age = ageOn(r.dob, t); v.age = age;
+    var f = v.flags;
+    if (r.dob > t || age > 110) f.push({ level: 'stop', code: 'dob_unreal', text: "The birth date in the barcode isn't realistic." });
+    if (r.issued && r.issued > t) f.push({ level: 'stop', code: 'issue_future', text: 'The issue date (' + fmt(r.issued) + ') is in the future.' });
+    if (r.issued && r.exp && r.issued > r.exp) f.push({ level: 'stop', code: 'issue_after_exp', text: 'The issue date is after the expiration date.' });
+    if (r.issued && r.issued < r.dob) f.push({ level: 'stop', code: 'issued_before_dob', text: 'The card says it was issued before the birth date.' });
+    if (r.under21Until && Math.abs(daysBetween(addYears(r.dob, 21), r.under21Until)) > 2)
+      f.push({ level: 'stop', code: 'u21_mismatch', text: 'The barcode\'s "under 21 until" date (' + fmt(r.under21Until) + ") doesn't match its birth date." });
+    var turns = addYears(r.dob, minAge), expired = !!(r.exp && r.exp < t);
+    if (age < minAge) return out({ status: 'deny', reason: 'under_age', main: 'UNDER ' + minAge, sub: 'Do not sell',
+      head: age + ' years old', why: 'Turns ' + minAge + ' on ' + fmt(turns) + '.' + (expired ? ' This ID is also expired.' : '') });
+    if (expired) return out({ status: 'deny', reason: 'expired', main: 'EXPIRED', sub: 'Do not sell',
+      head: 'Expired ' + fmt(r.exp), why: 'Ask for a current, unexpired ID.' });
+    if (f.some(function (x) { return x.level === 'stop'; })) return out({ status: 'check', reason: 'data_mismatch', main: 'CHECK ID', sub: 'Get a manager',
+      head: "The barcode data doesn't add up", why: 'Problems like these can mean an altered or fake card. Have a manager look at it before selling.' });
+    if (!r.exp) return out({ status: 'check', reason: 'no_exp', main: 'CHECK ID', sub: 'No expiration',
+      head: age + ' years old', why: 'There is no expiration date in the barcode. Check the date printed on the card.' });
+    var left = daysBetween(t, r.exp);
+    return out({ status: 'clear', reason: 'ok', main: 'CLEARED', sub: minAge + ' and over', head: age + ' years old',
+      why: left === 0 ? 'Expires today.' : left <= 30 ? 'Expires in ' + left + ' day' + (left === 1 ? '' : 's') + '.' : 'Expires ' + fmt(r.exp) + '.' });
+  }
+
+  function makeSamples(today) {
+    var t = startOfDay(today || new Date());
+    function sh(y, d) { return new Date(t.getFullYear() + y, t.getMonth(), t.getDate() + d); }
+    function US(d) { return pad2(d.getMonth() + 1) + pad2(d.getDate()) + d.getFullYear(); }
+    function CA(d) { return d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()); }
+    function build(iin, ver, type, pairs, v1) {
+      var body = type + pairs.map(function (p) { return p[0] + p[1]; }).join('\n') + '\r';
+      var head = '@\n\x1e\rANSI ' + iin + ver + (v1 ? '' : '00') + '01';
+      return head + type + pad4(head.length + 10) + pad4(body.length) + body;
+    }
+    function std(o) {
+      return [['DCA', 'D'], ['DCB', 'NONE'], ['DCD', 'NONE'], ['DBA', US(o.exp)], ['DCS', o.last], ['DAC', o.first], ['DAD', o.mid || 'NONE'],
+        ['DBD', US(o.iss)], ['DBB', US(o.dob)], ['DBC', o.sex || '1'], ['DAY', o.eyes || 'BRO'], ['DAU', o.ht || '070 IN'],
+        ['DAG', '100 SAMPLE ST'], ['DAI', o.city], ['DAJ', o.st], ['DAK', o.zip], ['DAQ', o.id], ['DCF', 'SAMPLE' + o.id.slice(-4)],
+        ['DCG', 'USA'], ['DDE', 'N'], ['DDF', 'N'], ['DDG', 'N'], ['DDA', 'F'], ['DDJ', US(o.ddj || addYears(o.dob, 21))]];
+    }
+    var ny = { last: 'RIVERA', first: 'JORDAN', mid: 'ALEX', dob: sh(-34, -47), exp: sh(4, 120), iss: sh(-4, 120), city: 'NEW YORK', st: 'NY', zip: '100120000', id: '123456789' };
+    return [
+      { label: 'New York, 34 years old', raw: build('636001', '09', 'DL', std(ny)) },
+      { label: 'New Jersey, 19 years old', raw: build('636036', '10', 'DL', std({ last: 'PATEL', first: 'RIYA', dob: sh(-19, -30), exp: sh(3, 0), iss: sh(-1, 0), city: 'NEWARK', st: 'NJ', zip: '071020000', id: 'P12345678901234', sex: '2', eyes: 'BLK', ht: '064 IN' })) },
+      { label: 'California, expired', raw: build('636014', '08', 'DL', std({ last: 'NGUYEN', first: 'TAM', dob: sh(-45, -200), exp: sh(0, -40), iss: sh(-5, -40), city: 'OAKLAND', st: 'CA', zip: '946120000', id: 'D1234567' })) },
+      { label: 'Pennsylvania ID card, 2005 format', raw: build('636025', '03', 'ID', [['DAQ', '99887766'], ['DCS', 'CHEN'], ['DCT', 'MORGAN LEE'], ['DBA', US(sh(2, 60))], ['DBB', US(sh(-62, -15))], ['DBD', US(sh(-2, 60))], ['DBC', '2'], ['DAY', 'HAZ'], ['DAU', '065 IN'], ['DAG', '12 SAMPLE AVE'], ['DAI', 'PHILADELPHIA'], ['DAJ', 'PA'], ['DAK', '191030000'], ['DCF', 'PA0001'], ['DCG', 'USA']]) },
+      { label: 'Ontario, Canada', raw: build('636012', '07', 'DL', [['DCA', 'G'], ['DCB', 'NONE'], ['DCD', 'NONE'], ['DBA', CA(sh(3, 10))], ['DCS', 'TREMBLAY'], ['DAC', 'EMILIE'], ['DAD', 'NONE'], ['DBD', CA(sh(-2, 10))], ['DBB', CA(sh(-27, -90))], ['DBC', '2'], ['DAY', 'BLU'], ['DAU', '168 CM'], ['DAG', '45 SAMPLE RD'], ['DAI', 'TORONTO'], ['DAJ', 'ON'], ['DAK', 'M5V 2T6'], ['DAQ', 'T1234-56789-01234'], ['DCF', 'ON1234'], ['DCG', 'CAN'], ['DDE', 'N'], ['DDF', 'N'], ['DDG', 'N']]) },
+      { label: 'Texas, 2000 format', raw: build('636015', '01', 'DL', [['DAQ', '12345678'], ['DAA', 'GARCIA,SAM,J'], ['DAG', '9 SAMPLE LN'], ['DAI', 'AUSTIN'], ['DAJ', 'TX'], ['DAK', '78701'], ['DBA', CA(sh(1, 200))], ['DBB', CA(sh(-41, -3))], ['DBC', 'M'], ['DBD', CA(sh(-5, 200))], ['DAU', '5-11']], true) },
+      { label: 'Scanner with no line breaks', raw: build('636001', '09', 'DL', std(ny)).replace(/[\n\r\x1e]/g, '') },
+      { label: 'Altered barcode data', raw: build('636001', '09', 'DL', std({ last: 'SMITH', first: 'CASEY', dob: sh(-30, -10), exp: sh(3, 0), iss: sh(-2, 0), city: 'BROOKLYN', st: 'NY', zip: '112170000', id: '987654321', ddj: sh(0, 200) })) },
+      { label: "Not an ID", raw: 'TTA-LOYALTY-0001234567' }
+    ];
+  }
+
+  return { analyze: analyze, verdict: verdict, parseDate: parseDate, parseTyped: parseTyped, makeSamples: makeSamples,
+    fmt: fmt, ageOn: ageOn, addYears: addYears, startOfDay: startOfDay, daysBetween: daysBetween, IIN: IIN, BY_ABBR: BY_ABBR };
+})();
+/*CORE-END*/
+</script>
+
+<script>
+(function () {
+'use strict';
+
+/* =====================================================================
+   SETUP
+   1. Paste your Firebase web app config below (Firebase console >
+      Project settings > Your apps > Web app > Config).
+   2. Add the Google accounts that can open Reports. Keep this list the
+      same as the managerEmails list in your Firestore rules.
+   ===================================================================== */
+const FIREBASE_CONFIG = null;
+const MANAGER_EMAILS = ['markemuniz@gmail.com'];
+
+const STORES = [
+  { id: 'soho',  name: 'SoHo',              color: 'var(--s1)' },
+  { id: 'usq',   name: 'Union Square',      color: 'var(--s2)' },
+  { id: 'dtbk',  name: 'Downtown Brooklyn', color: 'var(--s3)' },
+  { id: 'fifth', name: '5th Ave',           color: 'var(--s4)' }
+];
+const HOME_STATE = 'NY';
+const APP_VERSION = '1.0';
+const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
+const DEDUPE_MS = 120000; // same card again within 2 minutes is counted once
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const C = IDCore;
+const ls = {
+  get(k, d) { try { const v = localStorage.getItem('ttaid.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('ttaid.' + k, JSON.stringify(v)); } catch (e) {} }
+};
+const S = {
+  store: ls.get('store', ''), station: ls.get('station', ''),
+  minAge: ls.get('minAge', 21), clearSecs: ls.get('clearSecs', 20),
+  sound: ls.get('sound', true), showRaw: ls.get('showRaw', false)
+};
+// Optional link that pre-picks the store: index.html?store=usq
+try { const qs = new URLSearchParams(location.search).get('store'); if (qs && STORES.some(s => s.id === qs)) { S.store = qs; ls.set('store', qs); } } catch (e) {}
+function saveS() { Object.keys(S).forEach(k => ls.set(k, S[k])); }
+const storeName = id => (STORES.find(s => s.id === id) || {}).name || '';
+const pad2 = n => String(n).padStart(2, '0');
+const dayKey = d => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+const hhmm = d => { let h = d.getHours(), m = pad2(d.getMinutes()); const ap = h < 12 ? 'am' : 'pm'; h = h % 12 || 12; return h + ':' + m + ' ' + ap; };
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/* ---------------- barcode drawing for the idle screen ---------------- */
+(function drawBarcode() {
+  const svg = $('#barcodeArt'); let seed = 9; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const rows = 8, rh = 92 / rows, u = 2.25, start = [8, 1, 1, 1, 1, 1, 1, 3], stop = [7, 1, 1, 3, 1, 1, 1, 2, 1];
+  let out = '';
+  for (let r = 0; r < rows; r++) {
+    let x = 0, bar = true;
+    const runs = start.slice();
+    while (runs.reduce((a, b) => a + b, 0) < 140) runs.push(1 + Math.floor(rnd() * 4));
+    runs.push(...stop);
+    for (const w of runs) { if (bar) out += `<rect x="${(x * u).toFixed(2)}" y="${(r * rh).toFixed(2)}" width="${(w * u).toFixed(2)}" height="${(rh + .3).toFixed(2)}"/>`; x += w; bar = !bar; }
+  }
+  svg.innerHTML = `<g fill="#18213A">${out}</g>`;
+})();
+
+/* ---------------- sound ---------------- */
+let ac = null;
+function tones(freqs, dur, type, vol) {
+  if (!S.sound) return;
+  try {
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    if (ac.state === 'suspended') ac.resume();
+    let t = ac.currentTime + 0.01;
+    for (const f of freqs) {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = type; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur + 0.02); t += dur + 0.035;
+    }
+  } catch (e) {}
+}
+const SOUND = { clear: () => tones([784, 1175], .13, 'sine', .28), deny: () => tones([196, 196, 196], .2, 'square', .12), check: () => tones([523, 523], .15, 'triangle', .3) };
+
+/* ---------------- status + focus ---------------- */
+const Scan = { active: false, buf: '', timer: 0, alt: '' };
+function refreshStatus() {
+  const st = $('#status'), focused = document.hasFocus();
+  $('#focusbar').hidden = focused;
+  if (!focused) { st.dataset.s = 'blur'; $('#statusText').textContent = 'Click the page to scan'; }
+  else if (Scan.active) { st.dataset.s = 'reading'; $('#statusText').textContent = 'Reading barcode'; }
+  else { st.dataset.s = 'ready'; $('#statusText').textContent = 'Ready to scan'; }
+  $('#nostore').hidden = !!S.store;
+  $('#brandStore').textContent = S.store ? storeName(S.store) + (S.station ? ', ' + S.station : '') : '';
+}
+window.addEventListener('focus', refreshStatus);
+window.addEventListener('blur', refreshStatus);
+setInterval(refreshStatus, 1500);
+
+/* ---------------- keyboard-wedge capture ----------------
+   The scanner "types" the barcode. AAMVA data starts with "@". Control
+   characters can arrive as Enter, Tab, Ctrl+letter, or Alt+numpad codes. */
+const IDLE_MS = 220;
+function inField(el) {
+  if (!el) return false;
+  const t = el.tagName;
+  if (t === 'TEXTAREA' || t === 'SELECT' || el.isContentEditable) return true;
+  if (t === 'INPUT') return !['checkbox', 'radio', 'button', 'submit', 'range', 'color'].includes(el.type);
+  return false;
+}
+function anyDialogOpen() { return $$('dialog').some(d => d.open); }
+function arm() { clearTimeout(Scan.timer); Scan.timer = setTimeout(finishScan, IDLE_MS); }
+document.addEventListener('keydown', e => {
+  if (e.isComposing) return;
+  const k = e.key, altDigit = e.altKey && /^Numpad\d$/.test(e.code);
+  if (!Scan.active) {
+    if (!altDigit) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (k.length !== 1 || k === ' ') {
+        if (k === 'Escape' && !anyDialogOpen() && current) { e.preventDefault(); clearResult(); }
+        return;
+      }
+      if (inField(document.activeElement) && k !== '@') return;
+    }
+    Scan.active = true; Scan.buf = ''; Scan.alt = ''; refreshStatus();
+  }
+  e.preventDefault(); e.stopPropagation();
+  if (altDigit) Scan.alt += e.code.slice(6);
+  else if (e.ctrlKey && !e.altKey) {
+    if (e.code === 'KeyJ' || e.code === 'KeyM') Scan.buf += '\n';
+    else if (e.code === 'Digit6' || k === '^' || k === '~') Scan.buf += '\x1e';
+    else if (e.code === 'BracketRight') Scan.buf += '\x1d';
+  }
+  else if (k === 'Enter' || k === 'Tab') Scan.buf += '\n';
+  else if (k.length === 1 && !e.altKey) Scan.buf += k;
+  arm();
+}, true);
+document.addEventListener('keyup', e => {
+  if (!Scan.active) return;
+  e.preventDefault();
+  if ((e.key === 'Alt' || e.key === 'AltGraph') && Scan.alt) {
+    const code = parseInt(Scan.alt, 10); Scan.alt = '';
+    if (code === 10 || code === 13) Scan.buf += '\n';
+    else if (code > 0 && code < 65536) Scan.buf += String.fromCharCode(code);
+    arm();
+  }
+}, true);
+function finishScan() {
+  const raw = Scan.buf;
+  Scan.active = false; Scan.buf = ''; Scan.alt = ''; refreshStatus();
+  if (raw.replace(/\s/g, '').length < 16) return; // a stray keypress, not a scan
+  $$('dialog').forEach(d => d.open && d.close());
+  handleRaw(raw, 'scan');
+}
+document.addEventListener('paste', e => {
+  if (inField(document.activeElement)) return;
+  const txt = (e.clipboardData || window.clipboardData).getData('text');
+  if (txt && txt.length > 16) { e.preventDefault(); handleRaw(txt, 'paste'); }
+});
+
+/* ---------------- result screen ---------------- */
+let current = null, clearTimer = 0;
+function handleRaw(raw, source) {
+  if (location.hash === '#reports') location.hash = '';
+  const r = C.analyze(raw);
+  const v = C.verdict(r, { minAge: S.minAge, today: new Date() });
+  let note = source === 'sample' ? 'Sample ID. Not counted or saved.' : source === 'paste' ? 'Pasted text. Not counted or saved.' : '';
+  if (source === 'scan') note = record(r, v, 'scan') || note;
+  showResult(r, v, note, raw);
+}
+function showResult(r, v, note, raw) {
+  current = { r, v };
+  const page = $('#page');
+  page.dataset.state = v.status;
+  $('#idle').hidden = true; $('#result').hidden = false;
+  $('#sMain').textContent = v.main; $('#sSub').textContent = v.sub;
+  $('#rHead').textContent = v.head; $('#rReason').textContent = v.why;
+  const fl = $('#flags'); fl.innerHTML = '';
+  v.flags.forEach(f => { const li = document.createElement('li'); li.className = f.level; li.textContent = f.text; fl.appendChild(li); });
+  $('#match').hidden = v.status === 'deny';
+  $('#rNote').textContent = note || '';
+  page.classList.remove('stamped'); void page.offsetWidth; page.classList.add('stamped');
+  SOUND[v.status]();
+
+  // details
+  $('#detIdle').hidden = true; $('#detFull').hidden = false;
+  const nm = r.name || {};
+  $('#dName').textContent = r.manual ? r.docLabel : ([nm.first, nm.middle, nm.last].filter(Boolean).join(' ') + (nm.suffix ? ' ' + nm.suffix : '')) || 'Name not in barcode';
+  const rows = [];
+  if (r.dob) rows.push(['Born', C.fmt(r.dob), v.age != null ? 'Age ' + v.age : '']);
+  if (r.recognized || r.manual) {
+    let rel = '';
+    if (r.exp) { const d = C.daysBetween(new Date(), r.exp); rel = d < 0 ? 'Expired ' + (-d) + ' day' + (d === -1 ? '' : 's') + ' ago' : d === 0 ? 'Expires today' : d <= 60 ? 'In ' + d + ' days' : 'In ' + Math.round(d / 30.4) + ' months'; if (d > 730) rel = 'In ' + Math.floor(d / 365) + ' years'; }
+    rows.push(['Expires', r.exp ? C.fmt(r.exp) : 'Not in barcode', rel]);
+  }
+  if (!r.manual && r.recognized) {
+    rows.push(['Issued by', r.issuer ? r.issuer.name : (r.state || 'Unknown'), [r.docType, r.realId === true ? 'REAL ID' : r.realId === false ? 'Not REAL ID' : '', r.limited ? 'Limited term' : ''].filter(Boolean).join(', ')]);
+    if (r.issued) rows.push(['Issued', C.fmt(r.issued), '']);
+    const desc = [r.sex, r.height, r.eyes ? r.eyes + ' eyes' : ''].filter(Boolean).join(', ');
+    if (desc) rows.push(['Description', desc, '']);
+    if (r.idLast4) rows.push(['ID number', 'Ends in ' + r.idLast4, '']);
+  }
+  if (r.manual) rows.push(['Checked', 'By hand', 'Dates typed in by staff']);
+  $('#facts').innerHTML = rows.map(([k, val, sub]) => `<dt>${esc(k)}</dt><dd>${esc(val)}${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</dd>`).join('');
+
+  // raw (troubleshooting only, never saved)
+  if (S.showRaw && raw) {
+    $('#rawBox').hidden = false;
+    $('#rawText').innerHTML = esc(raw).replace(/\n/g, '<span class="cc">⏎</span>\n').replace(/\r/g, '<span class="cc">␍</span>\n').replace(/\x1e/g, '<span class="cc">␞</span>').replace(/\x1d/g, '<span class="cc">␝</span>');
+  } else $('#rawBox').hidden = true;
+
+  startClearTimer();
+}
+function startClearTimer() {
+  clearTimeout(clearTimer);
+  const d = $('#drain');
+  d.style.animation = 'none'; void d.offsetWidth;
+  if (S.clearSecs > 0) {
+    d.style.animation = `drain ${S.clearSecs}s linear forwards`;
+    clearTimer = setTimeout(clearResult, S.clearSecs * 1000);
+  }
+}
+function clearResult() {
+  clearTimeout(clearTimer); current = null;
+  const page = $('#page'); page.dataset.state = 'idle'; page.classList.remove('stamped');
+  $('#idle').hidden = false; $('#result').hidden = true;
+  $('#detIdle').hidden = false; $('#detFull').hidden = true; $('#facts').innerHTML = ''; $('#dName').textContent = '';
+  $('#rawBox').hidden = true; $('#rawText').textContent = '';
+  $('#drain').style.animation = 'none';
+}
+$('#clearNow').addEventListener('click', clearResult);
+
+/* ---------------- counting + saving ---------------- */
+const recent = new Map(); // card fingerprint -> time, memory only
+function tallyKey() { return 'tally.' + dayKey(new Date()); }
+function renderTally() { const t = ls.get(tallyKey(), { clear: 0, deny: 0, check: 0 }); $('#tClear').textContent = t.clear; $('#tDeny').textContent = t.deny; $('#tCheck').textContent = t.check; }
+function bumpTally(status) { const t = ls.get(tallyKey(), { clear: 0, deny: 0, check: 0 }); t[status] = (t[status] || 0) + 1; ls.set(tallyKey(), t); renderTally(); }
+function ageBand(a) { if (a == null || !isFinite(a)) return 'unk'; if (a < 21) return 'u21'; if (a < 25) return '21-24'; if (a < 35) return '25-34'; if (a < 45) return '35-44'; if (a < 55) return '45-54'; if (a < 65) return '55-64'; return '65+'; }
+
+function record(r, v, method) {
+  const now = Date.now();
+  for (const [k, t] of recent) if (now - t > DEDUPE_MS) recent.delete(k);
+  if (r.cardKey && recent.has(r.cardKey)) { recent.set(r.cardKey, now); return 'Same ID scanned again within 2 minutes, so it was counted once.'; }
+  if (r.cardKey) recent.set(r.cardKey, now);
+  bumpTally(v.status);
+  if (!S.store) return 'Not saved: this computer has no store yet.';
+  const d = new Date(now);
+  // Only non-identifying fields. No name, birth date, ID number or address.
+  enqueue({
+    at: now, day: dayKey(d), hour: d.getHours(), time: hhmm(d),
+    store: S.store, station: (S.station || 'Main').slice(0, 40), method,
+    result: v.status, reason: v.reason,
+    age: Number.isFinite(v.age) ? v.age : null, ageBand: ageBand(v.age),
+    issuer: method === 'manual' ? 'manual' : (r.issuer ? r.issuer.abbr : (r.state || 'unknown')),
+    country: r.country || null, docType: r.docCode || r.docKey || null,
+    realId: r.realId == null ? null : r.realId,
+    flags: (v.flags || []).map(f => f.code).filter(Boolean).slice(0, 10),
+    v: APP_VERSION
+  });
+  return '';
+}
+
+/* ---------------- Firebase ---------------- */
+const cloud = { state: 'off', fs: null, au: null, db: null, auth: null, user: null, inflight: 0, err: '' };
+let pending = ls.get('pending', []);
+function enqueue(entry) { pending.push(entry); ls.set('pending', pending); flush(); }
+function flush() {
+  if (!cloud.db || !cloud.user) { renderCloud(); return; }
+  while (pending.length) {
+    const e = pending.shift(); ls.set('pending', pending);
+    cloud.inflight++;
+    writeEntry(e).then(() => { cloud.inflight--; cloud.err = ''; renderCloud(); })
+      .catch(err => { cloud.inflight--; cloud.err = (err && err.code) || 'save failed'; console.warn('ID Check save failed', err); renderCloud(); });
+  }
+  renderCloud();
+}
+function writeEntry(e) {
+  const { fs, db } = cloud;
+  const inc = fs.increment(1);
+  const scanRef = fs.doc(fs.collection(db, 'idScans'));
+  const dayRef = fs.doc(db, 'idDaily', e.day + '_' + e.store);
+  const batch = fs.writeBatch(db);
+  batch.set(scanRef, Object.assign({}, e, { ts: fs.Timestamp.fromMillis(e.at), savedAt: fs.serverTimestamp() }));
+  const upd = {
+    day: e.day, store: e.store, total: inc,
+    result: { [e.result]: inc }, reason: { [e.reason]: inc }, method: { [e.method]: inc },
+    hour: { [pad2(e.hour)]: inc }, ageBand: { [e.ageBand]: inc }, issuer: { [e.issuer]: inc }
+  };
+  if (e.result === 'deny') upd.denials = fs.arrayUnion({ id: scanRef.id, time: e.time, at: e.at, station: e.station, reason: e.reason, age: e.age, issuer: e.issuer });
+  batch.set(dayRef, upd, { merge: true });
+  return batch.commit(); // resolves once the server has it; offline writes wait in the browser
+}
+function renderCloud() {
+  const el = $('#cloud'); let txt = '', s = 'off';
+  const waiting = pending.length + cloud.inflight;
+  if (!FIREBASE_CONFIG) { txt = 'Saving is off until Firebase is connected'; }
+  else if (cloud.state === 'error') { s = 'error'; txt = 'Can’t reach Firebase (' + cloud.err + ')' + (waiting ? ', ' + waiting + ' waiting' : ''); }
+  else if (cloud.err) { s = 'error'; txt = 'Firebase refused a save (' + cloud.err + '). Check the rules.'; }
+  else if (!cloud.user) { txt = 'Connecting to Firebase' + (waiting ? ', ' + waiting + ' waiting' : ''); }
+  else if (waiting) { s = 'on'; txt = waiting + ' waiting to sync' + (navigator.onLine ? '' : ' (offline)'); }
+  else { s = 'on'; txt = S.store ? 'Saving to ' + storeName(S.store) + ' reports' : 'Connected'; }
+  el.dataset.s = s; el.textContent = txt;
+  const cl = $('#cloudLine'); if (cl) cl.textContent = txt + '.';
+}
+window.addEventListener('online', flush);
+async function initCloud() {
+  if (!FIREBASE_CONFIG) { renderCloud(); renderReports(); return; }
+  try {
+    const [appM, fs, au] = await Promise.all([import(SDK + 'firebase-app.js'), import(SDK + 'firebase-firestore.js'), import(SDK + 'firebase-auth.js')]);
+    const app = appM.initializeApp(FIREBASE_CONFIG);
+    let db;
+    try { db = fs.initializeFirestore(app, { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) }); }
+    catch (e) { db = fs.getFirestore(app); }
+    Object.assign(cloud, { fs, au, db, auth: au.getAuth(app), state: 'on' });
+    au.onAuthStateChanged(cloud.auth, user => {
+      cloud.user = user;
+      if (!user) au.signInAnonymously(cloud.auth).catch(err => { cloud.state = 'error'; cloud.err = err.code || 'sign-in failed'; renderCloud(); });
+      else { cloud.state = 'on'; flush(); }
+      renderCloud(); renderReports();
+    });
+  } catch (err) {
+    cloud.state = 'error'; cloud.err = 'could not load Firebase'; console.warn(err); renderCloud(); renderReports();
+  }
+}
+
+/* ---------------- manual check ---------------- */
+function autoSlash(inp) {
+  inp.addEventListener('input', () => {
+    const d = inp.value.replace(/\D/g, '').slice(0, 8);
+    inp.value = d.length > 4 ? d.slice(0, 2) + '/' + d.slice(2, 4) + '/' + d.slice(4) : d.length > 2 ? d.slice(0, 2) + '/' + d.slice(2) : d;
+  });
+}
+autoSlash($('#mDob')); autoSlash($('#mExp'));
+$('#manualForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const dob = C.parseTyped($('#mDob').value), exp = C.parseTyped($('#mExp').value), err = $('#mErr');
+  if (!dob) { err.textContent = 'Enter the birth date as MM/DD/YYYY.'; $('#mDob').focus(); return; }
+  if (!exp) { err.textContent = 'Enter the expiration date as MM/DD/YYYY.'; $('#mExp').focus(); return; }
+  err.textContent = '';
+  const sel = $('#mType');
+  const r = { manual: true, recognized: true, dob, exp, flags: [], docKey: sel.value, docLabel: sel.options[sel.selectedIndex].text, name: {} };
+  const v = C.verdict(r, { minAge: S.minAge, today: new Date() });
+  $('#dlgManual').close();
+  $('#mDob').value = ''; $('#mExp').value = '';
+  const note = record(r, v, 'manual');
+  showResult(r, v, note || 'Manual check. Compare the photo carefully.', '');
+});
+
+/* ---------------- dialogs + settings ---------------- */
+function openDialog(name) {
+  const map = { manual: '#dlgManual', settings: '#dlgSettings', setup: '#dlgSetup' };
+  const dlg = $(map[name]); if (!dlg) return;
+  if (name === 'settings') fillSettings();
+  if (name === 'setup') fillSetup();
+  dlg.showModal();
+  if (name === 'manual') setTimeout(() => $('#mDob').focus(), 30);
+}
+document.addEventListener('click', e => {
+  const o = e.target.closest('[data-open]'); if (o) { openDialog(o.dataset.open); return; }
+  const c = e.target.closest('[data-close]'); if (c) c.closest('dialog').close();
+});
+const setStore = $('#setStore');
+STORES.forEach(s => { setStore.add(new Option(s.name, s.id)); $('#rStore').add(new Option(s.name, s.id)); });
+$('#suStores').innerHTML = STORES.map(s => `<label><input type="radio" name="suStore" value="${s.id}"> ${esc(s.name)}</label>`).join('');
+function fillSettings() {
+  setStore.value = S.store; $('#setStation').value = S.station; $('#setAge').value = S.minAge;
+  $('#setClear').value = String(S.clearSecs); $('#setSound').checked = S.sound; $('#setRaw').checked = S.showRaw;
+  renderCloud();
+}
+function fillSetup() {
+  $$('#suStores input').forEach(i => { i.checked = i.value === S.store; });
+  $('#suStation').value = S.station; $('#suErr').textContent = '';
+}
+setStore.addEventListener('change', () => { S.store = setStore.value; saveS(); refreshStatus(); renderCloud(); });
+$('#setStation').addEventListener('change', e => { S.station = e.target.value.trim(); saveS(); refreshStatus(); });
+$('#setAge').addEventListener('change', e => { const n = parseInt(e.target.value, 10); S.minAge = n >= 18 && n <= 25 ? n : 21; e.target.value = S.minAge; saveS(); });
+$('#setClear').addEventListener('change', e => { S.clearSecs = parseInt(e.target.value, 10) || 0; saveS(); });
+$('#setSound').addEventListener('change', e => { S.sound = e.target.checked; saveS(); if (S.sound) SOUND.clear(); });
+$('#setRaw').addEventListener('change', e => { S.showRaw = e.target.checked; saveS(); });
+$('#setupForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const pick = $('#suStores input:checked');
+  if (!pick) { $('#suErr').textContent = 'Pick a store.'; return; }
+  S.store = pick.value; S.station = $('#suStation').value.trim(); saveS();
+  $('#dlgSetup').close(); refreshStatus(); renderCloud();
+});
+const samples = C.makeSamples(new Date());
+$('#samples').innerHTML = samples.map((s, i) => `<button type="button" data-sample="${i}">${esc(s.label)}</button>`).join('');
+$('#samples').addEventListener('click', e => {
+  const b = e.target.closest('[data-sample]'); if (!b) return;
+  $('#dlgSettings').close(); handleRaw(samples[+b.dataset.sample].raw, 'sample');
+});
+$('#pasteGo').addEventListener('click', () => {
+  const t = $('#pasteBox').value; if (!t.trim()) return;
+  $('#dlgSettings').close(); $('#pasteBox').value = ''; handleRaw(t, 'paste');
+});
+let resetArmed = false;
+$('#resetTally').addEventListener('click', e => {
+  if (!resetArmed) { resetArmed = true; e.target.textContent = 'Tap again to reset'; setTimeout(() => { resetArmed = false; e.target.textContent = "Reset today's count"; }, 3000); return; }
+  ls.set(tallyKey(), { clear: 0, deny: 0, check: 0 }); renderTally(); resetArmed = false; e.target.textContent = "Reset today's count";
+});
+
+/* ---------------- views ---------------- */
+function route() {
+  const rep = location.hash === '#reports';
+  $('#viewScan').hidden = rep; $('#foot').hidden = rep; $('#viewReports').hidden = !rep;
+  $('#tabScan').toggleAttribute('aria-current', !rep); $('#tabReports').toggleAttribute('aria-current', rep);
+  if (rep) { $('#tabReports').setAttribute('aria-current', 'page'); renderReports(); } else $('#tabScan').setAttribute('aria-current', 'page');
+}
+window.addEventListener('hashchange', route);
+
+/* =====================================================================
+   REPORTS (managers, Google sign-in)
+   ===================================================================== */
+const R = { range: 'today', store: 'all', docs: [], loadedKey: '', loading: false };
+const isManager = u => !!(u && !u.isAnonymous && u.email && MANAGER_EMAILS.map(x => x.toLowerCase()).includes(u.email.toLowerCase()));
+function gate(title, text, signIn, signOut) {
+  $('#rGate').hidden = false; $('#rBody').hidden = true;
+  $('#gTitle').textContent = title; $('#gText').textContent = text;
+  $('#gSignIn').hidden = !signIn; $('#gSignOut').hidden = !signOut;
+}
+function renderReports() {
+  if ($('#viewReports').hidden) return;
+  if (!FIREBASE_CONFIG) return gate('Reports', 'Reports turn on once Firebase is connected. Add the Firebase config at the top of the page code (look for FIREBASE_CONFIG).');
+  if (cloud.state === 'error' && !cloud.auth) return gate('Reports', 'Firebase didn’t load. Check the internet connection and refresh.');
+  if (!cloud.auth || !cloud.user) return gate('Reports', 'Connecting to Firebase…');
+  if (cloud.user.isAnonymous) return gate('Reports', 'Sign in with a manager Google account to see scan reports for all four stores.', true);
+  if (!isManager(cloud.user)) return gate('Reports', cloud.user.email + ' isn’t on the manager list for reports.', false, true);
+  $('#rGate').hidden = true; $('#rBody').hidden = false;
+  $('#rUser').textContent = cloud.user.email;
+  loadReports();
+}
+$('#gSignIn').addEventListener('click', async () => {
+  try { await cloud.au.signInWithPopup(cloud.auth, new cloud.au.GoogleAuthProvider()); }
+  catch (err) { $('#gText').textContent = 'Sign-in didn’t finish (' + (err.code || 'error') + '). Try again.'; }
+});
+async function signOutMgr() { try { await cloud.au.signOut(cloud.auth); } catch (e) {} }
+$('#gSignOut').addEventListener('click', signOutMgr);
+$('#rSignOut').addEventListener('click', signOutMgr);
+$$('.seg button').forEach(b => b.addEventListener('click', () => {
+  R.range = b.dataset.range; $$('.seg button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); loadReports();
+}));
+$('#rStore').addEventListener('change', e => { R.store = e.target.value; drawReports(); });
+$('#denMore').addEventListener('click', () => { R.allDenials = !R.allDenials; drawReports(); });
+
+function rangeDates(key) {
+  const today = C.startOfDay(new Date());
+  let start = today;
+  if (key === '7') start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6);
+  else if (key === '30') start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29);
+  else if (key === 'month') start = new Date(today.getFullYear(), today.getMonth(), 1);
+  const days = []; for (let d = new Date(start); d <= today; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) days.push(dayKey(d));
+  return { start, end: today, days };
+}
+async function loadReports() {
+  if (!cloud.db || !isManager(cloud.user)) return;
+  const { start, end } = rangeDates(R.range);
+  const key = R.range + dayKey(start);
+  R.loading = true;
+  $('#rRange').textContent = 'Loading…';
+  try {
+    const { fs, db } = cloud;
+    const q = fs.query(fs.collection(db, 'idDaily'), fs.where('day', '>=', dayKey(start)), fs.where('day', '<=', dayKey(end)));
+    const snap = await fs.getDocs(q);
+    R.docs = snap.docs.map(d => d.data()); R.loadedKey = key;
+    drawReports();
+  } catch (err) {
+    $('#rRange').textContent = 'Couldn’t load reports (' + (err.code || err.message) + ').';
+  }
+  R.loading = false;
+}
+const sumMap = (docs, field) => { const o = {}; docs.forEach(d => { const m = d[field] || {}; Object.keys(m).forEach(k => { o[k] = (o[k] || 0) + (m[k] || 0); }); }); return o; };
+const n0 = x => x || 0;
+const pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '–';
+const fmtDay = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+const hourLbl = h => { h = +h; return (h % 12 || 12) + (h < 12 ? 'a' : 'p'); };
+const REASON = { under_age: 'Under 21', expired: 'Expired ID' };
+const issuerLabel = k => k === 'manual' ? 'Manual check (no barcode)' : k === 'unknown' ? 'Unrecognized' : (C.BY_ABBR[k] || k);
+
+function drawReports() {
+  const { days, start, end } = rangeDates(R.range);
+  const docs = R.docs.filter(d => R.store === 'all' || d.store === R.store);
+  const total = docs.reduce((a, d) => a + n0(d.total), 0);
+  $('#rRange').textContent = (days.length === 1 ? fmtDay(days[0]) : fmtDay(days[0]) + ' to ' + fmtDay(days[days.length - 1])) + ', ' + (R.store === 'all' ? 'all stores' : storeName(R.store)) + ': ' + total.toLocaleString() + ' scans';
+
+  // stores table
+  const rows = STORES.filter(s => R.store === 'all' || s.id === R.store).map(s => {
+    const sd = R.docs.filter(d => d.store === s.id);
+    const res = sumMap(sd, 'result'), rea = sumMap(sd, 'reason'), iss = sumMap(sd, 'issuer');
+    const t = sd.reduce((a, d) => a + n0(d.total), 0);
+    const barcode = t - n0(iss.manual);
+    return { s, t, clear: n0(res.clear), under: n0(rea.under_age), expired: n0(rea.expired), flagged: n0(res.check), oos: barcode - n0(iss[HOME_STATE]) - n0(iss.unknown), barcode, manual: n0(iss.manual) };
+  });
+  const tot = rows.reduce((a, r) => { ['t', 'clear', 'under', 'expired', 'flagged', 'oos', 'barcode', 'manual'].forEach(k => a[k] += r[k]); return a; }, { t: 0, clear: 0, under: 0, expired: 0, flagged: 0, oos: 0, barcode: 0, manual: 0 });
+  const tr = (r, label, cls) => `<tr class="${cls || ''}"><td>${label}</td><td class="num">${r.t.toLocaleString()}</td><td class="num">${r.clear.toLocaleString()}</td><td class="num">${r.under}</td><td class="num">${r.expired}</td><td class="num">${r.flagged}</td><td class="num">${r.manual}</td><td class="num">${pct(r.oos, r.barcode)}</td></tr>`;
+  $('#tStores').innerHTML = `<thead><tr><th>Store</th><th class="num">Scans</th><th class="num">Cleared</th><th class="num">Under 21</th><th class="num">Expired</th><th class="num">Flagged</th><th class="num">Manual</th><th class="num">Out of state</th></tr></thead><tbody>` +
+    rows.map(r => tr(r, `<span class="swatch" style="background:${r.s.color}"></span>${esc(r.s.name)}`)).join('') + (rows.length > 1 ? tr(tot, 'All stores', 'total') : '') + '</tbody>';
+
+  // per day (line), only when range > 1 day
+  $('#pDays').hidden = days.length < 2;
+  if (days.length >= 2) {
+    const shown = STORES.filter(s => R.store === 'all' || s.id === R.store);
+    const series = shown.map(s => ({ name: s.name, color: s.color, values: days.map(k => { const d = R.docs.find(x => x.day === k && x.store === s.id); return d ? n0(d.total) : 0; }) }));
+    lineChart($('#cDays'), $('#lDays'), days.map(fmtDay), series);
+    $('#nDays').innerHTML = `<thead><tr><th>Day</th>${series.map(s => `<th class="num">${esc(s.name)}</th>`).join('')}</tr></thead><tbody>` + days.map((k, i) => `<tr><td>${fmtDay(k)}</td>${series.map(s => `<td class="num">${s.values[i]}</td>`).join('')}</tr>`).join('') + '</tbody>';
+  }
+
+  // hours
+  const hrs = sumMap(docs, 'hour'); const hk = Object.keys(hrs).map(Number).filter(h => hrs[pad2(h)] > 0);
+  if (hk.length) {
+    const lo = Math.min(...hk), hi = Math.max(...hk), labels = [], vals = [];
+    for (let h = lo; h <= hi; h++) { labels.push(hourLbl(h)); vals.push(n0(hrs[pad2(h)])); }
+    barChart($('#cHours'), labels, vals, i => `${labels[i]}: ${vals[i].toLocaleString()} scans`);
+    $('#nHours').innerHTML = '<thead><tr><th>Hour</th><th class="num">Scans</th></tr></thead><tbody>' + labels.map((l, i) => `<tr><td>${l}</td><td class="num">${vals[i]}</td></tr>`).join('') + '</tbody>';
+  } else { $('#cHours').innerHTML = '<p class="empty">No scans in this range yet.</p>'; $('#nHours').innerHTML = ''; }
+
+  // issuers
+  const iss = sumMap(docs, 'issuer'); const list = Object.keys(iss).map(k => ({ k, n: iss[k] })).sort((a, b) => b.n - a.n);
+  const top = list.slice(0, 8), rest = list.slice(8).reduce((a, x) => a + x.n, 0);
+  if (rest) top.push({ k: 'Other', n: rest });
+  const imax = Math.max(1, ...top.map(x => x.n)), isum = list.reduce((a, x) => a + x.n, 0);
+  $('#cIssuers').innerHTML = top.length ? top.map(x => `<div class="hbar"><span class="lbl" title="${esc(issuerLabel(x.k))}">${esc(issuerLabel(x.k))}</span><div><div class="fill" style="width:${(x.n / imax * 100).toFixed(1)}%"></div></div><span class="v">${x.n.toLocaleString()}<small>${pct(x.n, isum)}</small></span></div>`).join('') : '<p class="empty">No scans in this range yet.</p>';
+
+  // ages
+  const ab = sumMap(docs, 'ageBand'), bands = [['u21', 'Under 21'], ['21-24', '21–24'], ['25-34', '25–34'], ['35-44', '35–44'], ['45-54', '45–54'], ['55-64', '55–64'], ['65+', '65+']];
+  const av = bands.map(b => n0(ab[b[0]])), asum = av.reduce((a, b) => a + b, 0);
+  if (asum) {
+    barChart($('#cAges'), bands.map(b => b[1]), av, i => `${bands[i][1]}: ${av[i].toLocaleString()} (${pct(av[i], asum)})`);
+    $('#nAges').innerHTML = '<thead><tr><th>Age</th><th class="num">Scans</th><th class="num">Share</th></tr></thead><tbody>' + bands.map((b, i) => `<tr><td>${b[1]}</td><td class="num">${av[i]}</td><td class="num">${pct(av[i], asum)}</td></tr>`).join('') + '</tbody>';
+  } else { $('#cAges').innerHTML = '<p class="empty">No scans in this range yet.</p>'; $('#nAges').innerHTML = ''; }
+
+  // denials
+  const den = [];
+  docs.forEach(d => (d.denials || []).forEach(x => den.push(Object.assign({ day: d.day, store: d.store }, x))));
+  den.sort((a, b) => (b.at || 0) - (a.at || 0));
+  const shownDen = R.allDenials ? den.slice(0, 500) : den.slice(0, 25);
+  $('#denMore').hidden = den.length <= 25;
+  $('#denMore').textContent = R.allDenials ? 'Show fewer' : 'Show all ' + den.length.toLocaleString() + (den.length > 500 ? ' (first 500)' : '');
+  $('#tDenials').innerHTML = den.length ? '<thead><tr><th>Date</th><th>Time</th><th>Store</th><th>Station</th><th>Reason</th><th class="num">Age</th><th>ID from</th></tr></thead><tbody>' +
+    shownDen.map(x => `<tr><td>${fmtDay(x.day)}</td><td>${esc(x.time)}</td><td>${esc(storeName(x.store))}</td><td>${esc(x.station)}</td><td>${esc(REASON[x.reason] || x.reason)}</td><td class="num">${x.age == null ? '' : x.age}</td><td>${esc(issuerLabel(x.issuer))}</td></tr>`).join('') + '</tbody>'
+    : '<tbody><tr><td class="empty">No denials in this range.</td></tr></tbody>';
+}
+
+$('#rCsv').addEventListener('click', () => {
+  const docs = R.docs.filter(d => R.store === 'all' || d.store === R.store).sort((a, b) => (a.day + a.store).localeCompare(b.day + b.store));
+  const head = ['date', 'store', 'scans', 'cleared', 'denied_under_21', 'denied_expired', 'flagged', 'manual_checks', 'out_of_state'];
+  const lines = [head.join(',')].concat(docs.map(d => {
+    const iss = d.issuer || {}, man = n0(iss.manual), bc = n0(d.total) - man;
+    return [d.day, storeName(d.store), n0(d.total), n0((d.result || {}).clear), n0((d.reason || {}).under_age), n0((d.reason || {}).expired), n0((d.result || {}).check), man, bc - n0(iss[HOME_STATE]) - n0(iss.unknown)].map(v => /[",]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : v).join(',');
+  }));
+  const url = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
+  const a = document.createElement('a'); a.href = url; a.download = 'id-check-' + R.range + '-' + dayKey(new Date()) + '.csv';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+});
+
+/* ---------------- charts ---------------- */
+function niceTicks(max) {
+  max = Math.max(1, max);
+  const raw = max / 4, p = Math.pow(10, Math.floor(Math.log10(raw))), n = raw / p;
+  const step = Math.max(1, (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p);
+  const top = Math.ceil(max / step) * step, t = [];
+  for (let v = 0; v <= top + 1e-9; v += step) t.push(v);
+  return { top, ticks: t };
+}
+function tipEl(el) { let t = el.querySelector('.tip'); if (!t) { t = document.createElement('div'); t.className = 'tip'; el.appendChild(t); } return t; }
+function barPath(x, y, w, h, r) {
+  if (h <= 0) return '';
+  r = Math.min(r, w / 2, h);
+  return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+}
+function barChart(el, labels, values, tipText) {
+  const W = Math.max(280, el.clientWidth || 480), H = 220, m = { t: 10, r: 6, b: 26, l: 40 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b, { top, ticks } = niceTicks(Math.max(...values));
+  const band = iw / labels.length, bw = Math.max(3, Math.min(band - 4, band * 0.74)), every = Math.ceil(labels.length * 30 / iw);
+  const y = v => m.t + ih - v / top * ih;
+  let s = `<svg width="${W}" height="${H}" role="img" aria-label="Bar chart">`;
+  ticks.forEach(t => { s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(t)}" y2="${y(t)}" stroke="${t ? 'var(--grid)' : 'var(--axis)'}"/><text x="${m.l - 8}" y="${y(t) + 4}" text-anchor="end">${t.toLocaleString()}</text>`; });
+  values.forEach((v, i) => {
+    const x = m.l + i * band + (band - bw) / 2;
+    s += `<path class="bar" data-i="${i}" d="${barPath(x, y(v), bw, ih + m.t - y(v), 4)}" fill="var(--s1)"/>`;
+    if (i % every === 0) s += `<text x="${m.l + i * band + band / 2}" y="${H - 8}" text-anchor="middle">${esc(labels[i])}</text>`;
+  });
+  values.forEach((v, i) => { s += `<rect class="hit" data-i="${i}" x="${m.l + i * band}" y="${m.t}" width="${band}" height="${ih}" fill="transparent"/>`; });
+  s += '</svg>';
+  el.innerHTML = s;
+  const tip = tipEl(el), bars = el.querySelectorAll('path.bar');
+  el.querySelectorAll('rect.hit').forEach(h => {
+    h.addEventListener('mouseenter', () => {
+      const i = +h.dataset.i; bars.forEach(b => b.setAttribute('fill', +b.dataset.i === i ? 'var(--s1-strong)' : 'var(--s1)'));
+      tip.textContent = tipText(i); tip.style.left = (m.l + i * band + band / 2) + 'px'; tip.style.top = y(values[i]) + 'px'; tip.classList.add('on');
+    });
+    h.addEventListener('mouseleave', () => { tip.classList.remove('on'); bars.forEach(b => b.setAttribute('fill', 'var(--s1)')); });
+  });
+  el._redraw = () => barChart(el, labels, values, tipText);
+}
+function lineChart(el, legendEl, xLabels, series) {
+  const W = Math.max(280, el.clientWidth || 480), H = 230, direct = W > 520 && series.length <= 4;
+  const m = { t: 12, r: direct ? 132 : 10, b: 26, l: 40 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b, { top, ticks } = niceTicks(Math.max(1, ...series.flatMap(s => s.values)));
+  const n = xLabels.length, x = i => m.l + (n === 1 ? iw / 2 : i / (n - 1) * iw), y = v => m.t + ih - v / top * ih;
+  const every = Math.ceil(n * 52 / iw);
+  legendEl.innerHTML = series.length > 1 ? '<div class="legend">' + series.map(s => `<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join('') + '</div>' : '';
+  let s = `<svg width="${W}" height="${H}" role="img" aria-label="Line chart of scans per day">`;
+  ticks.forEach(t => { s += `<line x1="${m.l}" x2="${m.l + iw}" y1="${y(t)}" y2="${y(t)}" stroke="${t ? 'var(--grid)' : 'var(--axis)'}"/><text x="${m.l - 8}" y="${y(t) + 4}" text-anchor="end">${t.toLocaleString()}</text>`; });
+  xLabels.forEach((l, i) => { if (i % every === 0 || i === n - 1) s += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle">${esc(l)}</text>`; });
+  series.forEach(se => { s += `<path d="${se.values.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(v).toFixed(1)).join('')}" fill="none" stroke="${se.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`; });
+  if (direct) {
+    const ends = series.map(se => ({ name: se.name, y: y(se.values[n - 1]) })).sort((a, b) => a.y - b.y);
+    for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 15) ends[i].y = ends[i - 1].y + 15;
+    ends.forEach(e => { s += `<text class="dl" x="${m.l + iw + 8}" y="${e.y + 4}">${esc(e.name)}</text>`; });
+  }
+  s += `<line class="xh" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}" stroke="var(--axis)" opacity="0"/><g class="dots"></g>`;
+  s += `<rect class="hit" x="${m.l - 10}" y="${m.t}" width="${iw + 20}" height="${ih}" fill="transparent"/></svg>`;
+  el.innerHTML = s;
+  const tip = tipEl(el), xh = el.querySelector('.xh'), dots = el.querySelector('.dots');
+  const hit = el.querySelector('rect.hit');
+  hit.addEventListener('mousemove', ev => {
+    const bx = hit.getBoundingClientRect(), px = ev.clientX - bx.left + (m.l - 10);
+    const i = Math.max(0, Math.min(n - 1, Math.round((px - m.l) / (iw / Math.max(1, n - 1)))));
+    xh.setAttribute('x1', x(i)); xh.setAttribute('x2', x(i)); xh.setAttribute('opacity', '1');
+    dots.innerHTML = series.map(se => `<circle cx="${x(i)}" cy="${y(se.values[i])}" r="4.5" fill="${se.color}" stroke="var(--surface)" stroke-width="2"/>`).join('');
+    tip.innerHTML = `<b>${esc(xLabels[i])}</b>` + series.map(se => `<br><i style="background:${se.color}"></i>${esc(se.name)}: ${se.values[i].toLocaleString()}`).join('');
+    tip.style.left = Math.min(Math.max(x(i), 90), W - 90) + 'px'; tip.style.top = Math.min(...series.map(se => y(se.values[i]))) + 'px'; tip.classList.add('on');
+  });
+  hit.addEventListener('mouseleave', () => { tip.classList.remove('on'); xh.setAttribute('opacity', '0'); dots.innerHTML = ''; });
+  el._redraw = () => lineChart(el, legendEl, xLabels, series);
+}
+let rz = 0;
+window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (!$('#viewReports').hidden) ['#cDays', '#cHours', '#cAges'].forEach(s => { const el = $(s); if (el._redraw && el.offsetParent) el._redraw(); }); }, 150); });
+
+/* ---------------- start ---------------- */
+renderTally(); refreshStatus(); route(); renderCloud(); initCloud();
+if (!S.store) setTimeout(() => openDialog('setup'), 300);
+window.IDCheckDebug = { handleRaw, drawReports, R, S }; // used for testing
+})();
+</script>
+</body>
+</html>
