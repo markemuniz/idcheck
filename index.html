@@ -109,6 +109,10 @@ button{cursor:pointer}
 .tally{display:flex;gap:22px;margin:0;align-items:baseline;flex-wrap:wrap}
 .tally b{font-family:var(--display);font-size:30px;font-weight:800;margin-right:6px;font-variant-numeric:tabular-nums}
 .t-where,.cloud{color:var(--on-cover-muted);font-size:14px}
+.t-btn{display:inline-flex;align-items:baseline;background:transparent;color:inherit;border:0;border-radius:8px;padding:2px 10px;margin:0 -10px;font:inherit;cursor:pointer}
+.t-btn span{text-decoration:underline dotted var(--on-cover-muted);text-underline-offset:5px;text-decoration-thickness:2px}
+.t-btn:hover{background:var(--cover-2)}
+.t-btn:hover span{text-decoration-color:currentColor}
 .cloud[data-s="error"]{color:#FFB4B4}
 .foot-actions{margin-left:auto;display:flex;gap:10px}
 
@@ -137,6 +141,26 @@ dialog::backdrop{background:rgba(9,15,30,.62)}
 .dlg label.check input{width:18px;height:18px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
 .dlg-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
+.l-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 14px}
+.l-tabs button{background:#fff;color:var(--ink);border:1px solid var(--rule);border-radius:999px;padding:7px 14px;font:inherit;font-size:15px;font-weight:600;cursor:pointer}
+.l-tabs button span{font-variant-numeric:tabular-nums;color:var(--muted);margin-left:2px}
+.l-tabs button[aria-pressed="true"]{color:#fff}
+.l-tabs button[aria-pressed="true"] span{color:inherit}
+.l-tabs button[data-s="clear"][aria-pressed="true"]{background:var(--clear);border-color:var(--clear)}
+.l-tabs button[data-s="deny"][aria-pressed="true"]{background:var(--deny);border-color:var(--deny)}
+.l-tabs button[data-s="check"][aria-pressed="true"]{background:var(--check);border-color:var(--check)}
+.l-list{list-style:none;margin:0;padding:0;max-height:min(56vh,520px);overflow:auto;border-top:1px solid var(--rule)}
+.l-list li{display:grid;grid-template-columns:74px 1fr;gap:2px 14px;padding:12px 2px;border-bottom:1px solid var(--rule)}
+.l-list li.l-empty{display:block;color:var(--muted);font-size:15px;padding:16px 2px}
+.l-time{color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums;padding-top:2px}
+.l-name{font-weight:700;font-size:17px;overflow-wrap:anywhere}
+.l-meta,.l-why,.l-flags{grid-column:2;font-size:14px}
+.l-meta{color:var(--muted)}
+.l-why{font-weight:700}
+.l-flags{color:var(--muted)}
+.l-list li[data-s="deny"] .l-why{color:var(--deny)}
+.l-list li[data-s="check"] .l-why{color:var(--check)}
+.l-note{color:var(--muted);font-size:13px;margin:12px 0 0}
 .err{color:var(--deny);font-weight:600;min-height:1.4em;margin:0 0 6px;font-size:15px}
 .samples{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
 .samples button{background:#fff;border:1px solid var(--rule);border-radius:999px;padding:6px 12px;font-size:14px;font-weight:500}
@@ -252,7 +276,7 @@ details.numbers table{margin-top:8px}
   <aside class="details" aria-label="Customer details">
     <div id="detIdle">
       <h2 class="d-title">Customer details</h2>
-      <p class="d-empty">Details show here after a scan, then clear on their own so customer info doesn't stay on screen. Names, birth dates and ID numbers are never saved.</p>
+      <p class="d-empty">Details show here after a scan, then clear on their own so customer info doesn't stay on screen. Birth dates and ID numbers are never saved. Names stay on this computer for today's lists only.</p>
     </div>
     <div id="detFull" hidden>
       <p class="d-name" id="dName"></p>
@@ -308,10 +332,24 @@ details.numbers table{margin-top:8px}
 </section>
 
 <footer class="foot" id="foot">
-  <p class="tally"><span><b id="tClear">0</b>cleared</span><span><b id="tDeny">0</b>denied</span><span><b id="tCheck">0</b>flagged</span><span class="t-where">on this computer today</span></p>
+  <p class="tally"><button type="button" class="t-btn" data-list="clear" aria-haspopup="dialog"><b id="tClear">0</b><span>cleared</span></button><button type="button" class="t-btn" data-list="deny" aria-haspopup="dialog"><b id="tDeny">0</b><span>denied</span></button><button type="button" class="t-btn" data-list="check" aria-haspopup="dialog"><b id="tCheck">0</b><span>flagged</span></button><span class="t-where">on this computer today</span></p>
   <span class="cloud" id="cloud" data-s="off"></span>
   <div class="foot-actions"><button class="btn" data-open="manual">Manual check</button><button class="btn ghost" data-open="settings">Settings</button></div>
 </footer>
+
+<!-- Today's lists (names stay on this computer only) -->
+<dialog id="dlgList" class="wide" aria-labelledby="lTitle">
+  <div class="dlg">
+    <div class="dlg-head"><h2 id="lTitle">Cleared today</h2><button class="btn-plain" data-close>Done</button></div>
+    <div class="l-tabs" role="group" aria-label="Show">
+      <button type="button" data-s="clear" aria-pressed="true">Cleared <span></span></button>
+      <button type="button" data-s="deny" aria-pressed="false">Denied <span></span></button>
+      <button type="button" data-s="check" aria-pressed="false">Flagged <span></span></button>
+    </div>
+    <ul class="l-list" id="lList"></ul>
+    <p class="l-note">Only scans from this computer. Names stay on this computer, are erased after midnight, and are never sent to Reports.</p>
+  </div>
+</dialog>
 
 <!-- Manual check -->
 <dialog id="dlgManual" aria-labelledby="mTitle">
@@ -382,7 +420,7 @@ details.numbers table{margin-top:8px}
     </section>
     <section>
       <h3>On-screen count</h3>
-      <p class="hint">Resets the count shown at the bottom of this computer. Saved reports aren't affected.</p>
+      <p class="hint">Resets the count and today's lists at the bottom of this computer. Saved reports aren't affected.</p>
       <button class="btn-plain danger" id="resetTally">Reset today's count</button>
     </section>
   </div>
@@ -890,6 +928,73 @@ const recent = new Map(); // card fingerprint -> time, memory only
 function tallyKey() { return 'tally.' + dayKey(new Date()); }
 function renderTally() { const t = ls.get(tallyKey(), { clear: 0, deny: 0, check: 0 }); $('#tClear').textContent = t.clear; $('#tDeny').textContent = t.deny; $('#tCheck').textContent = t.check; }
 function bumpTally(status) { const t = ls.get(tallyKey(), { clear: 0, deny: 0, check: 0 }); t[status] = (t[status] || 0) + 1; ls.set(tallyKey(), t); renderTally(); }
+/* Today's lists. Names stay in this computer's storage only, are erased
+   after midnight, and are never sent to Firebase. */
+function logKey() { return 'log.' + dayKey(new Date()); }
+function purgeOldLogs() {
+  try {
+    const keep = 'ttaid.' + logKey();
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.indexOf('ttaid.log.') === 0 && k !== keep) localStorage.removeItem(k);
+    }
+  } catch (e) {}
+}
+function logScan(r, v, method, now) {
+  purgeOldLogs();
+  const manual = method === 'manual' || r.manual;
+  const nm = r.name || {};
+  const name = manual ? '' : [nm.first, nm.middle, nm.last, nm.suffix].filter(Boolean).join(' ');
+  const where = manual ? (r.docLabel || '') : (r.issuer ? r.issuer.name : (r.state || ''));
+  const log = ls.get(logKey(), []);
+  log.push({
+    at: now, time: hhmm(new Date(now)), s: v.status, manual: !!manual,
+    name: name.trim(), where, doc: manual ? '' : (r.docType || ''),
+    age: Number.isFinite(v.age) ? v.age : null, main: v.main || '', sub: v.sub || '',
+    flags: v.status === 'clear' ? [] : (v.flags || []).map(f => f.text).filter(Boolean).slice(0, 4)
+  });
+  ls.set(logKey(), log.slice(-500));
+}
+const LIST_TITLE = { clear: 'Cleared today', deny: 'Denied today', check: 'Flagged today' };
+let listShow = 'clear';
+function sentence(s) { return s ? s.charAt(0) + s.slice(1).toLowerCase() : ''; }
+function renderList() {
+  purgeOldLogs();
+  const log = ls.get(logKey(), []);
+  const t = ls.get(tallyKey(), { clear: 0, deny: 0, check: 0 });
+  $('#lTitle').textContent = LIST_TITLE[listShow];
+  $$('#dlgList .l-tabs button').forEach(b => {
+    b.setAttribute('aria-pressed', String(b.dataset.s === listShow));
+    b.querySelector('span').textContent = t[b.dataset.s] || 0;
+  });
+  const ul = $('#lList'); ul.innerHTML = '';
+  const rows = log.filter(e => e.s === listShow).sort((a, b) => b.at - a.at);
+  rows.forEach(e => {
+    const li = document.createElement('li'); li.dataset.s = e.s;
+    const add = (cls, txt) => { if (!txt) return; const el = document.createElement('span'); el.className = cls; el.textContent = txt; li.appendChild(el); };
+    add('l-time', e.time);
+    add('l-name', e.name || (e.manual ? 'Manual check' : 'Name not in barcode'));
+    add('l-meta', [e.age !== null ? 'Age ' + e.age : '', e.where, e.doc].filter(Boolean).join(' · '));
+    if (e.s !== 'clear') add('l-why', e.s === 'deny' ? sentence(e.main) : e.sub);
+    if (e.flags && e.flags.length) add('l-flags', e.flags.join(' · '));
+    ul.appendChild(li);
+  });
+  const missing = (t[listShow] || 0) - rows.length;
+  if (!rows.length || missing > 0) {
+    const li = document.createElement('li'); li.className = 'l-empty';
+    li.textContent = missing > 0
+      ? missing + (missing === 1 ? ' earlier scan was' : ' earlier scans were') + ' counted before this list was added, so ' + (missing === 1 ? "it isn't" : "they aren't") + ' shown.'
+      : 'None yet today on this computer.';
+    ul.appendChild(li);
+  }
+}
+function openList(s) { listShow = s; renderList(); $('#dlgList').showModal(); }
+$$('.t-btn').forEach(b => b.addEventListener('click', () => openList(b.dataset.list)));
+$$('#dlgList .l-tabs button').forEach(b => b.addEventListener('click', () => { listShow = b.dataset.s; renderList(); }));
+$('#dlgList').addEventListener('close', () => { $('#lList').innerHTML = ''; if (document.activeElement) document.activeElement.blur(); });
+setInterval(() => { purgeOldLogs(); renderTally(); }, 60000);
+purgeOldLogs();
+
 function ageBand(a) { if (a == null || !isFinite(a)) return 'unk'; if (a < 21) return 'u21'; if (a < 25) return '21-24'; if (a < 35) return '25-34'; if (a < 45) return '35-44'; if (a < 55) return '45-54'; if (a < 65) return '55-64'; return '65+'; }
 
 function record(r, v, method) {
@@ -898,6 +1003,7 @@ function record(r, v, method) {
   if (r.cardKey && recent.has(r.cardKey)) { recent.set(r.cardKey, now); return 'Same ID scanned again within 2 minutes, so it was counted once.'; }
   if (r.cardKey) recent.set(r.cardKey, now);
   bumpTally(v.status);
+  try { logScan(r, v, method, now); } catch (e) { console.warn('ID Check list failed', e); }
   if (!S.store) return 'Not saved: this computer has no store yet.';
   const d = new Date(now);
   // Only non-identifying fields. No name, birth date, ID number or address.
@@ -1052,7 +1158,7 @@ $('#pasteGo').addEventListener('click', () => {
 let resetArmed = false;
 $('#resetTally').addEventListener('click', e => {
   if (!resetArmed) { resetArmed = true; e.target.textContent = 'Tap again to reset'; setTimeout(() => { resetArmed = false; e.target.textContent = "Reset today's count"; }, 3000); return; }
-  ls.set(tallyKey(), { clear: 0, deny: 0, check: 0 }); renderTally(); resetArmed = false; e.target.textContent = "Reset today's count";
+  ls.set(tallyKey(), { clear: 0, deny: 0, check: 0 }); ls.set(logKey(), []); renderTally(); resetArmed = false; e.target.textContent = "Reset today's count";
 });
 
 /* ---------------- views ---------------- */
