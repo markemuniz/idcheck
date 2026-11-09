@@ -60,6 +60,7 @@ button{cursor:pointer}
 .page[data-state="clear"]{background:var(--clear-tint);--stamp:var(--clear);--stamp-bg:var(--clear-tint)}
 .page[data-state="deny"]{background:var(--deny-tint);--stamp:var(--deny);--stamp-bg:var(--deny-tint)}
 .page[data-state="check"]{background:var(--check-tint);--stamp:var(--check);--stamp-bg:var(--check-tint)}
+.page[data-state="ban"]{background:#F2CFD2;--stamp:#8C1019;--stamp-bg:#F2CFD2}
 
 .idle{max-width:560px}
 .barcode{width:min(360px,100%);height:auto;display:block;margin-bottom:30px;opacity:.9}
@@ -222,6 +223,41 @@ details.numbers{margin-top:8px}
 details.numbers summary{cursor:pointer;color:var(--muted);font-size:13px}
 details.numbers table{margin-top:8px}
 
+/* ---------- visits + bans ---------- */
+.btn.small,.btn-plain.small,.btn-danger.small{padding:6px 12px;font-size:14px}
+.btn-danger{background:var(--deny);color:#fff;border:0;border-radius:8px;padding:10px 18px;font-weight:700}
+.daypick{display:inline-flex;align-items:center;gap:6px}
+.daypick input,.r-find input{background:var(--cover-2);border:1px solid var(--cover-line);border-radius:8px;padding:7px 10px;color:var(--on-cover);color-scheme:dark}
+.daypick button{background:var(--cover-2);border:1px solid var(--cover-line);border-radius:8px;color:var(--on-cover);width:36px;height:36px;font-size:18px;line-height:1}
+.r-find{display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px}
+.r-find input{width:min(220px,48vw)}
+.v-list{list-style:none;margin:0;padding:0}
+.v-row{display:grid;grid-template-columns:86px minmax(0,1fr) auto;gap:4px 16px;padding:13px 0;border-top:1px solid var(--grid);align-items:start}
+.v-list>.v-row:first-child,.v-hour+.v-row{border-top:0}
+.v-hour{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding:16px 0 4px;border-bottom:1px solid var(--rule)}
+.v-list>.v-hour:first-child{padding-top:2px}
+.v-when{font-variant-numeric:tabular-nums;font-weight:600;font-size:15px;padding-top:2px}
+.v-when small{display:block;font-weight:400;color:var(--muted);font-size:13px}
+.v-main{min-width:0}
+.v-main p{margin:0}
+.v-name{font-weight:700;font-size:17px;overflow-wrap:anywhere;display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
+.v-meta{color:var(--muted);font-size:14px;margin-top:2px!important}
+.v-note{font-size:15px;margin:6px 0 2px!important;padding:6px 10px;background:#fff;border-left:3px solid var(--deny);border-radius:0 6px 6px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.v-act{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.chip{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--clear-tint);color:var(--clear);letter-spacing:.01em}
+.chip[data-s="deny"]{background:var(--deny-tint);color:var(--deny)}
+.chip[data-s="check"]{background:var(--check-tint);color:var(--check)}
+.chip.ban{background:#8C1019;color:#fff}
+.chip.off{background:var(--grid);color:var(--muted)}
+.ban-who{background:#fff;border:1px solid var(--rule);border-radius:8px;padding:12px 14px;margin:6px 0 16px}
+.ban-who p{margin:0}
+.ban-who .v-name{font-size:18px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--on-cover);color:var(--cover);font-weight:700;padding:11px 18px;border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.3);z-index:10;max-width:calc(100vw - 32px)}
+@media (max-width:640px){
+  .v-row{grid-template-columns:64px minmax(0,1fr)}
+  .v-act{grid-column:2;justify-content:flex-start}
+}
+
 @media (max-width:900px){
   .desk{grid-template-columns:1fr}
   .rgrid{grid-template-columns:1fr}
@@ -241,6 +277,8 @@ details.numbers table{margin-top:8px}
   <h1 class="brand">ID Check<span class="brand-store" id="brandStore"></span></h1>
   <nav class="tabs" aria-label="Views">
     <a href="#" class="tab" id="tabScan" aria-current="page">Scan</a>
+    <a href="#visits" class="tab" id="tabVisits">Visits</a>
+    <a href="#bans" class="tab" id="tabBans">Bans</a>
     <a href="#reports" class="tab" id="tabReports">Reports</a>
   </nav>
   <div class="status" id="status" data-s="ready" role="status"><span class="dot"></span><span id="statusText">Ready to scan</span></div>
@@ -276,7 +314,7 @@ details.numbers table{margin-top:8px}
   <aside class="details" aria-label="Customer details">
     <div id="detIdle">
       <h2 class="d-title">Customer details</h2>
-      <p class="d-empty">Details show here after a scan, then clear on their own so customer info doesn't stay on screen. Birth dates and ID numbers are never saved. Names stay on this computer for today's lists only.</p>
+      <p class="d-empty">Details show here after a scan, then clear on their own so customer info doesn't stay on screen. Each visit is saved for managers so they can look someone up later. Birth dates, full ID numbers and addresses are never saved.</p>
     </div>
     <div id="detFull" hidden>
       <p class="d-name" id="dName"></p>
@@ -289,14 +327,41 @@ details.numbers table{margin-top:8px}
   </aside>
 </main>
 
-<section id="viewReports" class="reports" hidden>
+<section id="viewGate" class="reports" hidden>
   <div class="r-gate" id="rGate">
     <h2 id="gTitle">Reports</h2>
     <p id="gText"></p>
     <button class="btn" id="gSignIn" hidden>Sign in with Google</button>
     <button class="btn ghost" id="gSignOut" hidden>Sign out</button>
   </div>
-  <div id="rBody" hidden>
+</section>
+
+<section id="viewVisits" class="reports" hidden>
+  <div class="r-controls">
+    <div class="daypick"><button type="button" id="vPrev" aria-label="Previous day">‹</button><input type="date" id="vDay" aria-label="Day"><button type="button" id="vNext" aria-label="Next day">›</button></div>
+    <label class="r-store">Store <select id="vStore"><option value="all">All stores</option></select></label>
+    <label class="r-find">Find <input type="search" id="vFind" placeholder="Last name" autocomplete="off" spellcheck="false"></label>
+    <span class="r-user"><span class="mgrEmail"></span> <button class="linkish" data-signout>Sign out</button></span>
+  </div>
+  <p class="r-range" id="vRange"></p>
+  <div class="rpanel"><ul class="v-list" id="vList"></ul></div>
+</section>
+
+<section id="viewBans" class="reports" hidden>
+  <div class="r-controls">
+    <div class="seg" role="group" aria-label="Show">
+      <button data-bshow="active" aria-pressed="true">Banned</button>
+      <button data-bshow="lifted" aria-pressed="false">Lifted</button>
+    </div>
+    <button class="btn" id="bAdd">Add a ban</button>
+    <span class="r-user"><span class="mgrEmail"></span> <button class="linkish" data-signout>Sign out</button></span>
+  </div>
+  <p class="r-range" id="bRange"></p>
+  <div class="rpanel"><ul class="v-list" id="bList"></ul></div>
+</section>
+
+<section id="viewReports" class="reports" hidden>
+  <div id="rBody">
     <div class="r-controls">
       <div class="seg" role="group" aria-label="Date range">
         <button data-range="today" aria-pressed="true">Today</button>
@@ -305,7 +370,7 @@ details.numbers table{margin-top:8px}
         <button data-range="month" aria-pressed="false">This month</button>
       </div>
       <label class="r-store">Store <select id="rStore"><option value="all">All stores</option></select></label>
-      <span class="r-user"><span id="rUser"></span> <button class="linkish" id="rSignOut">Sign out</button></span>
+      <span class="r-user"><span class="mgrEmail"></span> <button class="linkish" data-signout>Sign out</button></span>
     </div>
     <p class="r-range" id="rRange"></p>
     <div class="rpanel">
@@ -324,7 +389,7 @@ details.numbers table{margin-top:8px}
       <details class="numbers"><summary>Show numbers</summary><div class="tablewrap"><table class="rtable" id="nWeek"></table></div></details>
     </div>
     <div class="rpanel">
-      <h2>Denials</h2><p class="rp-sub">Newest first. Only age, reason and issuing state are kept.</p>
+      <h2>Denials</h2><p class="rp-sub">Newest first. Names are under Visits.</p>
       <div class="tablewrap"><table class="rtable" id="tDenials"></table></div>
       <button class="btn-plain" id="denMore" style="margin-top:12px" hidden></button>
     </div>
@@ -347,9 +412,55 @@ details.numbers table{margin-top:8px}
       <button type="button" data-s="check" aria-pressed="false">Flagged <span></span></button>
     </div>
     <ul class="l-list" id="lList"></ul>
-    <p class="l-note">Only scans from this computer. Names stay on this computer, are erased after midnight, and are never sent to Reports.</p>
+    <p class="l-note">Only scans from this computer today. Managers can look up any day and any store under Visits.</p>
   </div>
 </dialog>
+
+<!-- One person's visits -->
+<dialog id="dlgPerson" class="wide" aria-labelledby="pTitle">
+  <div class="dlg">
+    <div class="dlg-head"><h2 id="pTitle"></h2><button class="btn-plain" data-close>Done</button></div>
+    <p class="dlg-sub" id="pSub"></p>
+    <ul class="v-list" id="pList"></ul>
+    <div class="dlg-actions" style="margin-top:14px"><button type="button" class="btn-danger" id="pBan">Ban this person</button></div>
+  </div>
+</dialog>
+
+<!-- Ban someone -->
+<dialog id="dlgBan" aria-labelledby="bTitle">
+  <form class="dlg" id="banForm" novalidate>
+    <h2 id="bTitle">Ban from all TTA stores</h2>
+    <div class="ban-who" id="banWho"></div>
+    <div id="banManual" hidden>
+      <p class="dlg-sub">For someone who isn't in Visits. Type the name and birth date exactly as they appear on their ID.</p>
+      <div class="two">
+        <label>First name <input id="bFirst" autocomplete="off" maxlength="60"></label>
+        <label>Last name <input id="bLast" autocomplete="off" maxlength="60"></label>
+      </div>
+      <label>Date of birth <input id="bDob" inputmode="numeric" placeholder="MM/DD/YYYY" autocomplete="off" maxlength="10"></label>
+    </div>
+    <div class="two">
+      <label>Reason <select id="bReason"><option value="">Pick one</option></select></label>
+      <label>Where it happened <select id="bStore"></select></label>
+    </div>
+    <label>What happened <textarea id="bNote" rows="3" maxlength="500" placeholder="Short and factual. Other managers will read this."></textarea></label>
+    <p class="err" id="bErr" role="alert"></p>
+    <div class="dlg-actions"><button type="button" class="btn-plain" data-close>Cancel</button><button type="submit" class="btn-danger" id="bGo">Ban at all 4 stores</button></div>
+  </form>
+</dialog>
+
+<!-- Lift a ban -->
+<dialog id="dlgLift" aria-labelledby="lfTitle">
+  <form class="dlg" id="liftForm" novalidate>
+    <h2 id="lfTitle">Lift this ban?</h2>
+    <p class="dlg-sub" id="lfWho"></p>
+    <label>Why it's being lifted <textarea id="lfNote" rows="2" maxlength="300"></textarea></label>
+    <p class="err" id="lfErr" role="alert"></p>
+    <div class="dlg-actions"><button type="button" class="btn-plain" data-close>Cancel</button><button type="submit" class="btn-ink" id="lfGo">Lift ban</button></div>
+  </form>
+</dialog>
+
+<p class="toast" id="toast" role="status" hidden></p>
 
 <!-- Manual check -->
 <dialog id="dlgManual" aria-labelledby="mTitle">
@@ -506,6 +617,7 @@ var IDCore = (function () {
   function height(s) {
     if (!s) return '';
     var f = /^(\d)\s*-\s*(\d{1,2})$/.exec(s); if (f) return f[1] + "'" + f[2] + '"';
+    var fi = /^([3-8])(0\d|1[01])$/.exec(s.trim()); if (fi) return fi[1] + "'" + parseInt(fi[2], 10) + '"'; // "510" = 5'10"
     var m = /(\d{2,3})\s*(IN|CM)?/i.exec(s); if (!m) return s;
     var n = parseInt(m[1], 10);
     if ((m[2] || '').toUpperCase() === 'CM') return n + ' cm';
@@ -717,9 +829,21 @@ const STORES = [
   { id: 'fifth', name: '5th Ave',           color: 'var(--s4)' }
 ];
 const HOME_STATE = 'NY';
-const APP_VERSION = '1.0';
+const BAN_REASONS = [
+  ['theft', 'Theft'],
+  ['threats', 'Threats, violence or harassment'],
+  ['fake_id', "Fake or someone else's ID"],
+  ['straw', 'Buying for someone else'],
+  ['disorderly', 'Disorderly or intoxicated'],
+  ['other', 'Other']
+];
+
+const APP_VERSION = '1.1';
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const DEDUPE_MS = 120000; // same card again within 2 minutes is counted once
+const BAN_WAIT_MS = 1500; // how long a scan waits on the ban list before showing
+const MGR_IDLE_MS = 15 * 60000; // store computers sign managers out after 15 idle minutes
+const KEY_SALT = 'tta-idcheck-v1';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -741,6 +865,35 @@ const pad2 = n => String(n).padStart(2, '0');
 const dayKey = d => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
 const hhmm = d => { let h = d.getHours(), m = pad2(d.getMinutes()); const ap = h < 12 ? 'am' : 'pm'; h = h % 12 || 12; return h + ':' + m + ' ' + ap; };
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const BAN_LABEL = Object.fromEntries(BAN_REASONS);
+const fmtDate = x => { let d; if (typeof x === 'string') { const [y, m, dd] = x.split('-').map(Number); d = new Date(y, m - 1, dd); } else d = new Date(x); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
+
+/* ---------------- person keys ----------------
+   One-way fingerprints so a ban (and repeat visits) can match the same
+   person later without storing their ID number or birth date.
+   person = issuing state + ID number. alt = first name + last name + birth date,
+   which still matches after they get a new license number. */
+const normName = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z]/g, '');
+const firstTok = s => normName(String(s || '').trim().split(/[\s,]+/)[0]);
+const ymd = d => d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate());
+async function sha(s) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(KEY_SALT + '|' + s));
+  return Array.from(new Uint8Array(buf).slice(0, 16), b => b.toString(16).padStart(2, '0')).join('');
+}
+const canHash = () => !!(window.crypto && crypto.subtle);
+async function altKey(first, last, dob) {
+  const f = firstTok(first), l = normName(last);
+  return canHash() && f && l && dob ? sha('nd|' + f + '|' + l + '|' + ymd(dob)) : null;
+}
+async function personKeys(r) {
+  if (!canHash() || !r || !r.recognized || r.manual) return { person: null, alt: null };
+  const raw = String((r.fields || {}).DAQ || '').replace(/\s/g, '').toUpperCase();
+  const idn = /^(NONE|UNAVL|UNAVAILABLE|N\/A|UNK)$/.test(raw) ? '' : raw;
+  const juris = r.issuer ? r.issuer.abbr : (r.state || '');
+  const nm = r.name || {};
+  const [person, alt] = await Promise.all([idn && juris ? sha('id|' + juris + '|' + idn) : null, altKey(nm.first, nm.last, r.dob)]);
+  return { person, alt };
+}
 
 /* ---------------- barcode drawing for the idle screen ---------------- */
 (function drawBarcode() {
@@ -852,19 +1005,57 @@ document.addEventListener('paste', e => {
 });
 
 /* ---------------- result screen ---------------- */
-let current = null, clearTimer = 0;
-function handleRaw(raw, source) {
-  if (location.hash === '#reports') location.hash = '';
-  const r = C.analyze(raw);
-  const v = C.verdict(r, { minAge: S.minAge, today: new Date() });
-  let note = source === 'sample' ? 'Sample ID. Not counted or saved.' : source === 'paste' ? 'Pasted text. Not counted or saved.' : '';
-  if (source === 'scan') note = record(r, v, 'scan') || note;
-  showResult(r, v, note, raw);
+let current = null, clearTimer = 0, scanSeq = 0;
+/* Ban list lookup. Stations can only fetch a ban key they already know
+   (from the ID in hand); they can't list the ban list or see names. */
+async function lookupBan(keys) {
+  const ids = [keys.person, keys.alt].filter(Boolean);
+  if (!ids.length) return { state: 'skip' };
+  if (!cloud.db || !cloud.user) return { state: 'offline' };
+  const { fs, db } = cloud;
+  const res = await Promise.allSettled(ids.map(id => fs.getDoc(fs.doc(db, 'idBanKeys', id))));
+  const ok = res.filter(x => x.status === 'fulfilled').map(x => x.value);
+  const hit = ok.find(s => s.exists() && s.data().active);
+  if (hit) return { state: 'hit', ban: hit.data() };
+  if (!ok.length) console.warn('ID Check ban lookup failed', res.map(x => x.reason));
+  return ok.length ? { state: 'clear' } : { state: 'error' };
 }
-function showResult(r, v, note, raw) {
-  current = { r, v };
+const waitFor = (p, ms) => Promise.race([p, new Promise(res => setTimeout(() => res({ state: 'slow' }), ms))]);
+function banVerdict(v, b) {
+  const when = b.since ? 'Banned ' + fmtDate(b.since) + (b.store ? ' at ' + storeName(b.store) : '') + '.' : '';
+  return Object.assign({}, v, {
+    status: 'deny', reason: 'banned', banned: true, main: 'BANNED', sub: 'Do not sell', flags: [],
+    head: 'Banned from all TTA stores', why: [BAN_LABEL[b.reason] ? 'Reason: ' + BAN_LABEL[b.reason] + '.' : '', when, 'Get a manager.'].filter(Boolean).join(' ')
+  });
+}
+async function handleRaw(raw, source) {
+  if (viewName() !== 'scan') location.hash = '';
+  const seq = ++scanSeq;
+  const r = C.analyze(raw);
+  let v = C.verdict(r, { minAge: S.minAge, today: new Date() });
+  let keys = { person: null, alt: null }, ban = { state: 'skip' }, late = null;
+  try { keys = await personKeys(r); } catch (e) { console.warn('ID Check keys failed', e); }
+  if (FIREBASE_CONFIG && (keys.person || keys.alt)) {
+    const p = lookupBan(keys).catch(err => { console.warn(err); return { state: 'error' }; });
+    ban = await waitFor(p, BAN_WAIT_MS);
+    if (ban.state === 'slow') late = p;
+  }
+  if (ban.state === 'hit') v = banVerdict(v, ban.ban);
+  let note = source === 'sample' ? 'Sample ID. Not counted or saved.' : source === 'paste' ? 'Pasted text. Not counted or saved.' : '';
+  if (source === 'scan') note = record(r, v, 'scan', keys) || note;
+  const banNote = { offline: "Ban list not checked: Firebase isn't connected.", error: "Couldn't check the ban list.", slow: 'Still checking the ban list…' }[ban.state] || '';
+  if (seq !== scanSeq) return; // a newer scan is already on screen
+  showResult(r, v, [note, banNote].filter(Boolean).join(' '), raw, seq);
+  if (late) late.then(b => {
+    if (!current || current.seq !== seq) return;
+    if (b.state === 'hit') showResult(r, banVerdict(v, b.ban), note, raw, seq);
+    else $('#rNote').textContent = [note, b.state === 'clear' ? '' : "Couldn't check the ban list."].filter(Boolean).join(' ');
+  });
+}
+function showResult(r, v, note, raw, seq) {
+  current = { r, v, seq: seq || ++scanSeq };
   const page = $('#page');
-  page.dataset.state = v.status;
+  page.dataset.state = v.banned ? 'ban' : v.status;
   $('#idle').hidden = true; $('#result').hidden = false;
   $('#sMain').textContent = v.main; $('#sSub').textContent = v.sub;
   $('#rHead').textContent = v.head; $('#rReason').textContent = v.why;
@@ -997,7 +1188,19 @@ purgeOldLogs();
 
 function ageBand(a) { if (a == null || !isFinite(a)) return 'unk'; if (a < 21) return 'u21'; if (a < 25) return '21-24'; if (a < 35) return '25-34'; if (a < 45) return '35-44'; if (a < 55) return '45-54'; if (a < 65) return '55-64'; return '65+'; }
 
-function record(r, v, method) {
+/* Who came in, for the manager-only Visits list. No birth date, full ID
+   number or address: just the name, description and last 4 of the ID. */
+function visitFields(r, v, keys) {
+  const nm = r.name || {}, cut = (s, n) => String(s || '').slice(0, n);
+  const name = ([nm.first, nm.middle, nm.last].filter(Boolean).join(' ') + (nm.suffix ? ' ' + nm.suffix : '')).trim();
+  return {
+    name: cut(name, 120), first: cut(nm.first, 60), last: cut(nm.last, 60), lastKey: cut(normName(nm.last), 60),
+    sex: r.sex || '', height: cut(r.height, 20), eyes: r.eyes || '', idLast4: cut(r.idLast4, 4),
+    person: keys.person || null, alt: keys.alt || null, banned: !!v.banned
+  };
+}
+
+function record(r, v, method, keys) {
   const now = Date.now();
   for (const [k, t] of recent) if (now - t > DEDUPE_MS) recent.delete(k);
   if (r.cardKey && recent.has(r.cardKey)) { recent.set(r.cardKey, now); return 'Same ID scanned again within 2 minutes, so it was counted once.'; }
@@ -1006,8 +1209,9 @@ function record(r, v, method) {
   try { logScan(r, v, method, now); } catch (e) { console.warn('ID Check list failed', e); }
   if (!S.store) return 'Not saved: this computer has no store yet.';
   const d = new Date(now);
-  // Only non-identifying fields. No name, birth date, ID number or address.
-  enqueue({
+  // idScans/idDaily get only non-identifying fields. The name and
+  // description ride along in `visit` and go to the manager-only idVisits.
+  const entry = {
     at: now, day: dayKey(d), hour: d.getHours(), time: hhmm(d),
     store: S.store, station: (S.station || 'Main').slice(0, 40), method,
     result: v.status, reason: v.reason,
@@ -1017,7 +1221,9 @@ function record(r, v, method) {
     realId: r.realId == null ? null : r.realId,
     flags: (v.flags || []).map(f => f.code).filter(Boolean).slice(0, 10),
     v: APP_VERSION
-  });
+  };
+  if (method === 'scan' && r.recognized) entry.visit = visitFields(r, v, keys || {});
+  enqueue(entry);
   return '';
 }
 
@@ -1035,8 +1241,9 @@ function flush() {
   }
   renderCloud();
 }
-function writeEntry(e) {
+function writeEntry(entry) {
   const { fs, db } = cloud;
+  const e = Object.assign({}, entry), visit = e.visit; delete e.visit;
   const inc = fs.increment(1);
   const scanRef = fs.doc(fs.collection(db, 'idScans'));
   const dayRef = fs.doc(db, 'idDaily', e.day + '_' + e.store);
@@ -1049,7 +1256,16 @@ function writeEntry(e) {
   };
   if (e.result === 'deny') upd.denials = fs.arrayUnion({ id: scanRef.id, time: e.time, at: e.at, station: e.station, reason: e.reason, age: e.age, issuer: e.issuer });
   batch.set(dayRef, upd, { merge: true });
-  return batch.commit(); // resolves once the server has it; offline writes wait in the browser
+  const saved = batch.commit(); // resolves once the server has it; offline writes wait in the browser
+  if (!visit) return saved;
+  // Separate write, so counts still save even if the visit is refused.
+  const visitRef = fs.doc(fs.collection(db, 'idVisits'));
+  const vSaved = fs.setDoc(visitRef, Object.assign({
+    at: e.at, ts: fs.Timestamp.fromMillis(e.at), savedAt: fs.serverTimestamp(), day: e.day, hour: e.hour, time: e.time,
+    store: e.store, station: e.station, result: e.result, reason: e.reason, age: e.age, issuer: e.issuer,
+    docType: e.docType, scan: scanRef.id, v: e.v
+  }, visit));
+  return Promise.all([saved, vSaved]);
 }
 function renderCloud() {
   const el = $('#cloud'); let txt = '', s = 'off';
@@ -1065,7 +1281,7 @@ function renderCloud() {
 }
 window.addEventListener('online', flush);
 async function initCloud() {
-  if (!FIREBASE_CONFIG) { renderCloud(); renderReports(); return; }
+  if (!FIREBASE_CONFIG) { renderCloud(); renderManagerView(); return; }
   try {
     const [appM, fs, au] = await Promise.all([import(SDK + 'firebase-app.js'), import(SDK + 'firebase-firestore.js'), import(SDK + 'firebase-auth.js')]);
     const app = appM.initializeApp(FIREBASE_CONFIG);
@@ -1077,10 +1293,10 @@ async function initCloud() {
       cloud.user = user;
       if (!user) au.signInAnonymously(cloud.auth).catch(err => { cloud.state = 'error'; cloud.err = err.code || 'sign-in failed'; renderCloud(); });
       else { cloud.state = 'on'; flush(); }
-      renderCloud(); renderReports();
+      renderCloud(); renderManagerView();
     });
   } catch (err) {
-    cloud.state = 'error'; cloud.err = 'could not load Firebase'; console.warn(err); renderCloud(); renderReports();
+    cloud.state = 'error'; cloud.err = 'could not load Firebase'; console.warn(err); renderCloud(); renderManagerView();
   }
 }
 
@@ -1162,44 +1378,310 @@ $('#resetTally').addEventListener('click', e => {
 });
 
 /* ---------------- views ---------------- */
+const MGR_VIEWS = { '#visits': 'visits', '#bans': 'bans', '#reports': 'reports' };
+const VIEW_EL = { visits: '#viewVisits', bans: '#viewBans', reports: '#viewReports' };
+const VIEW_TITLE = { visits: 'Visits', bans: 'Bans', reports: 'Reports' };
+const GATE_TEXT = {
+  visits: 'Sign in with a manager Google account to look up who came in and ban someone.',
+  bans: 'Sign in with a manager Google account to see and manage the ban list for all four stores.',
+  reports: 'Sign in with a manager Google account to see scan reports for all four stores.'
+};
+const viewName = () => MGR_VIEWS[location.hash] || 'scan';
 function route() {
-  const rep = location.hash === '#reports';
-  $('#viewScan').hidden = rep; $('#foot').hidden = rep; $('#viewReports').hidden = !rep;
-  $('#tabScan').toggleAttribute('aria-current', !rep); $('#tabReports').toggleAttribute('aria-current', rep);
-  if (rep) { $('#tabReports').setAttribute('aria-current', 'page'); renderReports(); } else $('#tabScan').setAttribute('aria-current', 'page');
+  const v = viewName();
+  $('#viewScan').hidden = v !== 'scan'; $('#foot').hidden = v !== 'scan';
+  [['scan', '#tabScan'], ['visits', '#tabVisits'], ['bans', '#tabBans'], ['reports', '#tabReports']].forEach(([n, id]) => {
+    if (n === v) $(id).setAttribute('aria-current', 'page'); else $(id).removeAttribute('aria-current');
+  });
+  if (v === 'scan') { $('#viewGate').hidden = true; Object.values(VIEW_EL).forEach(s => { $(s).hidden = true; }); return; }
+  mgrTouch();
+  renderManagerView();
 }
 window.addEventListener('hashchange', route);
 
 /* =====================================================================
-   REPORTS (managers, Google sign-in)
+   MANAGER VIEWS (Visits, Bans, Reports): Google sign-in
    ===================================================================== */
 const R = { range: 'today', store: 'all', docs: [], loadedKey: '', loading: false };
 const isManager = u => !!(u && !u.isAnonymous && u.email && MANAGER_EMAILS.map(x => x.toLowerCase()).includes(u.email.toLowerCase()));
 function gate(title, text, signIn, signOut) {
-  $('#rGate').hidden = false; $('#rBody').hidden = true;
+  Object.values(VIEW_EL).forEach(s => { $(s).hidden = true; });
+  $('#viewGate').hidden = false;
   $('#gTitle').textContent = title; $('#gText').textContent = text;
   $('#gSignIn').hidden = !signIn; $('#gSignOut').hidden = !signOut;
 }
-function renderReports() {
-  if ($('#viewReports').hidden) return;
-  if (!FIREBASE_CONFIG) return gate('Reports', 'Reports turn on once Firebase is connected. Add the Firebase config at the top of the page code (look for FIREBASE_CONFIG).');
-  if (cloud.state === 'error' && !cloud.auth) return gate('Reports', 'Firebase didn’t load. Check the internet connection and refresh.');
-  if (!cloud.auth || !cloud.user) return gate('Reports', 'Connecting to Firebase…');
-  if (cloud.user.isAnonymous) return gate('Reports', 'Sign in with a manager Google account to see scan reports for all four stores.', true);
-  if (!isManager(cloud.user)) return gate('Reports', cloud.user.email + ' isn’t on the manager list for reports.', false, true);
-  $('#rGate').hidden = true; $('#rBody').hidden = false;
-  $('#rUser').textContent = cloud.user.email;
-  loadReports();
+function renderManagerView() {
+  const v = viewName(); if (v === 'scan') return;
+  const t = VIEW_TITLE[v];
+  if (!FIREBASE_CONFIG) return gate(t, 'This turns on once Firebase is connected. Add the Firebase config at the top of the page code (look for FIREBASE_CONFIG).');
+  if (cloud.state === 'error' && !cloud.auth) return gate(t, 'Firebase didn’t load. Check the internet connection and refresh.');
+  if (!cloud.auth || !cloud.user) return gate(t, 'Connecting to Firebase…');
+  if (cloud.user.isAnonymous) return gate(t, GATE_TEXT[v], true);
+  if (!isManager(cloud.user)) return gate(t, cloud.user.email + ' isn’t on the manager list.', false, true);
+  $('#viewGate').hidden = true;
+  Object.keys(VIEW_EL).forEach(n => { $(VIEW_EL[n]).hidden = n !== v; });
+  $$('.mgrEmail').forEach(el => { el.textContent = cloud.user.email; });
+  if (v === 'reports') loadReports(); else if (v === 'visits') loadVisits(); else loadBans();
 }
 $('#gSignIn').addEventListener('click', async () => {
-  try { await cloud.au.signInWithPopup(cloud.auth, new cloud.au.GoogleAuthProvider()); }
+  try { await cloud.au.signInWithPopup(cloud.auth, new cloud.au.GoogleAuthProvider()); mgrTouch(); }
   catch (err) { $('#gText').textContent = 'Sign-in didn’t finish (' + (err.code || 'error') + '). Try again.'; }
 });
-async function signOutMgr() { try { await cloud.au.signOut(cloud.auth); } catch (e) {} }
+async function signOutMgr() { try { await cloud.au.signOut(cloud.auth); } catch (e) {} BX.at = 0; BX.list = []; BX.keys = new Map(); VS.rows = []; }
 $('#gSignOut').addEventListener('click', signOutMgr);
-$('#rSignOut').addEventListener('click', signOutMgr);
-$$('.seg button').forEach(b => b.addEventListener('click', () => {
-  R.range = b.dataset.range; $$('.seg button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); loadReports();
+$$('[data-signout]').forEach(b => b.addEventListener('click', signOutMgr));
+// Store computers are shared, so a manager left signed in gets signed out
+// after 15 minutes without using Visits, Bans or Reports.
+let mgrLast = Date.now();
+function mgrTouch() { mgrLast = Date.now(); }
+['pointerdown', 'keydown'].forEach(t => document.addEventListener(t, () => { if (viewName() !== 'scan') mgrTouch(); }, true));
+setInterval(() => {
+  const u = cloud.user;
+  if (u && !u.isAnonymous && S.store && Date.now() - mgrLast > MGR_IDLE_MS) { signOutMgr(); if (viewName() !== 'scan') location.hash = ''; }
+}, 30000);
+
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => { t.hidden = true; }, 3500);
+}
+const RESULT_LABEL = { clear: 'Cleared', check: 'Flagged' };
+const resultChip = x => `<span class="chip" data-s="${esc(x.result)}">${esc(x.result === 'deny' ? (REASON[x.reason] || 'Denied') : (RESULT_LABEL[x.result] || x.result))}</span>`;
+const describe = x => [x.age != null ? 'Age ' + x.age : '', [x.sex, x.height, x.eyes ? x.eyes + ' eyes' : ''].filter(Boolean).join(', '),
+  [issuerLabel(x.issuer || ''), x.idLast4 ? 'ID ends in ' + x.idLast4 : ''].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
+const hourHead = h => (h % 12 || 12) + (h < 12 ? ' am' : ' pm');
+
+/* ---------------- ban list (managers) ---------------- */
+const BX = { list: [], keys: new Map(), at: 0 };
+async function loadBanIndex(force) {
+  if (!force && BX.at && Date.now() - BX.at < 60000) return;
+  const { fs, db } = cloud;
+  const snap = await fs.getDocs(fs.collection(db, 'idBans'));
+  BX.list = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+  BX.keys = new Map();
+  BX.list.filter(b => b.active).forEach(b => { if (b.person) BX.keys.set(b.person, b); if (b.alt) BX.keys.set(b.alt, b); });
+  BX.at = Date.now();
+}
+const banFor = x => (x.person && BX.keys.get(x.person)) || (x.alt && BX.keys.get(x.alt)) || null;
+
+/* ---------------- Visits ---------------- */
+const VS = { day: dayKey(new Date()), store: S.store || 'all', find: '', rows: [], token: 0 };
+$$('#vStore, #bStore').forEach(sel => STORES.forEach(s => sel.add(new Option(s.name, s.id))));
+$('#vStore').value = VS.store;
+$('#vDay').value = VS.day;
+$('#vDay').max = VS.day;
+BAN_REASONS.forEach(([k, label]) => $('#bReason').add(new Option(label, k)));
+function shiftDay(n) {
+  const [y, m, d] = VS.day.split('-').map(Number), nd = new Date(y, m - 1, d + n);
+  if (nd > new Date()) return;
+  VS.day = dayKey(nd); $('#vDay').value = VS.day; VS.find = ''; $('#vFind').value = ''; loadVisits();
+}
+$('#vPrev').addEventListener('click', () => shiftDay(-1));
+$('#vNext').addEventListener('click', () => shiftDay(1));
+$('#vDay').addEventListener('change', e => { if (!e.target.value) return; VS.day = e.target.value; VS.find = ''; $('#vFind').value = ''; loadVisits(); });
+$('#vStore').addEventListener('change', e => { VS.store = e.target.value; if (VS.find) drawVisits(); else loadVisits(); });
+let findTimer = 0;
+$('#vFind').addEventListener('input', e => { clearTimeout(findTimer); findTimer = setTimeout(() => { VS.find = e.target.value; loadVisits(); }, 350); });
+
+async function loadVisits() {
+  if (!cloud.db || !isManager(cloud.user)) return;
+  const tok = ++VS.token, { fs, db } = cloud, col = fs.collection(db, 'idVisits');
+  const find = normName(VS.find);
+  $('#vRange').textContent = 'Loading…';
+  let q;
+  if (find) q = fs.query(col, fs.where('lastKey', '>=', find), fs.where('lastKey', '<=', find + ''), fs.orderBy('lastKey'), fs.limit(400));
+  else if (VS.store === 'all') q = fs.query(col, fs.where('day', '==', VS.day));
+  else q = fs.query(col, fs.where('day', '==', VS.day), fs.where('store', '==', VS.store));
+  try {
+    const [snap] = await Promise.all([fs.getDocs(q), loadBanIndex()]);
+    if (tok !== VS.token) return;
+    VS.rows = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    drawVisits();
+  } catch (err) {
+    if (tok === VS.token) { $('#vRange').textContent = 'Couldn’t load visits (' + (err.code || err.message) + ').'; $('#vList').innerHTML = ''; }
+  }
+}
+function visitRow(x, withDate) {
+  const b = banFor(x);
+  const act = (x.person || x.alt ? `<button class="btn-plain small" data-hist="${esc(x.id)}">All visits</button>` : '') +
+    (b ? `<button class="btn-plain small" data-goban>See ban</button>` : (x.person || x.alt ? `<button class="btn-danger small" data-ban="${esc(x.id)}">Ban</button>` : ''));
+  return `<li class="v-row"><div class="v-when">${esc(x.time)}${withDate ? `<small>${esc(fmtDate(x.day))}</small>` : ''}</div>` +
+    `<div class="v-main"><p class="v-name">${esc(x.name || 'Name not in barcode')} ${resultChip(x)}${b ? ' <span class="chip ban">Banned</span>' : ''}</p>` +
+    `<p class="v-meta">${esc(describe(x))}</p><p class="v-meta">${esc([storeName(x.store), x.station].filter(Boolean).join(' · '))}</p></div>` +
+    `<div class="v-act">${act}</div></li>`;
+}
+function drawVisits() {
+  const find = normName(VS.find);
+  const rows = VS.rows.filter(x => VS.store === 'all' || x.store === VS.store).sort((a, b) => (b.at || 0) - (a.at || 0));
+  const where = VS.store === 'all' ? 'all stores' : storeName(VS.store);
+  const n = rows.length + (rows.length === 1 ? ' visit' : ' visits');
+  $('#vRange').textContent = find
+    ? 'Last names starting with “' + find + '”, ' + where + ', any date: ' + n + (VS.rows.length >= 400 ? ' (first 400, type more of the name)' : '')
+    : new Date(VS.day + 'T12:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' }) + ', ' + where + ': ' + n;
+  if (!rows.length) {
+    $('#vList').innerHTML = `<li class="empty">${find ? 'Nobody by that last name.' : 'No visits saved for this day.'} Only barcode scans are saved as visits, not manual checks.</li>`;
+    return;
+  }
+  let html = '', lastHour = null;
+  rows.forEach(x => {
+    if (!find && x.hour !== lastHour) { lastHour = x.hour; html += `<li class="v-hour">${hourHead(x.hour)}</li>`; }
+    html += visitRow(x, !!find);
+  });
+  $('#vList').innerHTML = html;
+}
+function visitById(id) { return VS.rows.find(x => x.id === id) || PV.rows.find(x => x.id === id); }
+document.addEventListener('click', e => {
+  const h = e.target.closest('[data-hist]'); if (h) { const x = visitById(h.dataset.hist); if (x) openPerson(x); return; }
+  const b = e.target.closest('[data-ban]'); if (b) { const x = visitById(b.dataset.ban); if (x) openBan({ mode: 'visit', row: x }); return; }
+  if (e.target.closest('[data-goban]')) { $$('dialog').forEach(d => d.open && d.close()); location.hash = '#bans'; }
+});
+
+/* one person's visits */
+const PV = { row: null, rows: [] };
+async function openPerson(x) {
+  PV.row = x; PV.rows = [];
+  $('#pTitle').textContent = x.name || 'Name not in barcode';
+  $('#pSub').textContent = 'Loading…'; $('#pList').innerHTML = '';
+  $('#pBan').hidden = !!banFor(x);
+  $('#dlgPerson').showModal();
+  const { fs, db } = cloud, col = fs.collection(db, 'idVisits');
+  try {
+    const q = x.person ? fs.query(col, fs.where('person', '==', x.person)) : fs.query(col, fs.where('alt', '==', x.alt));
+    const snap = await fs.getDocs(q);
+    if (PV.row !== x) return;
+    PV.rows = snap.docs.map(d => Object.assign({ id: d.id }, d.data())).sort((a, b) => (b.at || 0) - (a.at || 0));
+    const stores = [...new Set(PV.rows.map(r => storeName(r.store)))].join(', ');
+    const first = PV.rows[PV.rows.length - 1];
+    $('#pSub').textContent = describe(x) + '. ' + PV.rows.length + (PV.rows.length === 1 ? ' visit' : ' visits') + (first ? ' since ' + fmtDate(first.day) : '') + (stores ? ' at ' + stores : '') + '.';
+    $('#pList').innerHTML = PV.rows.map(r => `<li class="v-row"><div class="v-when">${esc(fmtDate(r.day))}<small>${esc(r.time)}</small></div>` +
+      `<div class="v-main"><p class="v-name" style="font-size:15px">${esc([storeName(r.store), r.station].filter(Boolean).join(' · '))} ${resultChip(r)}</p></div><div></div></li>`).join('');
+  } catch (err) { $('#pSub').textContent = 'Couldn’t load visits (' + (err.code || err.message) + ').'; }
+}
+$('#pBan').addEventListener('click', () => { const x = PV.row; $('#dlgPerson').close(); if (!x) return; if (x._ban) openBan({ mode: 'reban', ban: x._ban }); else openBan({ mode: 'visit', row: x }); });
+
+/* ---------------- ban + lift ---------------- */
+let banCtx = null;
+autoSlash($('#bDob'));
+function openBan(ctx) {
+  banCtx = ctx;
+  const manual = ctx.mode === 'manual', x = ctx.row || ctx.ban || {};
+  $('#banManual').hidden = !manual; $('#banWho').hidden = manual;
+  $('#bTitle').textContent = ctx.mode === 'reban' ? 'Ban again' : 'Ban from all TTA stores';
+  if (!manual) {
+    const seen = ctx.mode === 'visit' ? 'Seen ' + fmtDate(x.day) + ' at ' + x.time + ', ' + storeName(x.store) : '';
+    $('#banWho').innerHTML = `<p class="v-name">${esc(x.name || 'Name not in barcode')}</p><p class="v-meta">${esc(describe(x))}</p>${seen ? `<p class="v-meta">${esc(seen)}</p>` : ''}`;
+  }
+  $('#bFirst').value = ''; $('#bLast').value = ''; $('#bDob').value = '';
+  $('#bReason').value = ctx.mode === 'reban' ? (x.reason || '') : '';
+  $('#bStore').value = x.store || S.store || STORES[0].id;
+  $('#bNote').value = ''; $('#bErr').textContent = ''; $('#bGo').disabled = false;
+  $('#dlgBan').showModal();
+  setTimeout(() => (manual ? $('#bFirst') : $('#bReason')).focus(), 30);
+}
+$('#bAdd').addEventListener('click', () => openBan({ mode: 'manual' }));
+$('#banForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const err = $('#bErr'), ctx = banCtx; if (!ctx) return;
+  const reason = $('#bReason').value, store = $('#bStore').value, note = $('#bNote').value.trim();
+  let info, person = null, alt = null;
+  if (ctx.mode === 'manual') {
+    const first = $('#bFirst').value.trim(), last = $('#bLast').value.trim(), dob = C.parseTyped($('#bDob').value);
+    if (!first || !last) { err.textContent = 'Enter their first and last name.'; return; }
+    if (!dob) { err.textContent = 'Enter the birth date as MM/DD/YYYY.'; $('#bDob').focus(); return; }
+    alt = await altKey(first, last, dob);
+    if (!alt) { err.textContent = 'This browser can’t make a ban key. Use Chrome on the store computer.'; return; }
+    info = { name: (first + ' ' + last).toUpperCase(), first: first.toUpperCase(), last: last.toUpperCase(), age: C.ageOn(dob, new Date()), sex: '', height: '', eyes: '', issuer: '', idLast4: '' };
+  } else {
+    const x = ctx.row || ctx.ban; person = x.person || null; alt = x.alt || null;
+    if (!person && !alt) { err.textContent = 'This visit has no ID number or birth date to match, so a ban can’t catch them.'; return; }
+    info = { name: x.name || '', first: x.first || '', last: x.last || '', age: x.age == null ? null : x.age, sex: x.sex || '', height: x.height || '', eyes: x.eyes || '', issuer: x.issuer || '', idLast4: x.idLast4 || '' };
+  }
+  if (!reason) { err.textContent = 'Pick a reason.'; $('#bReason').focus(); return; }
+  err.textContent = ''; $('#bGo').disabled = true;
+  try {
+    await saveBan(Object.assign(info, { person, alt, reason, store, note, visit: ctx.row ? ctx.row.id : (ctx.ban && ctx.ban.visit) || null, source: ctx.mode === 'manual' ? 'manual' : (ctx.ban ? ctx.ban.source || 'visit' : 'visit') }));
+    $('#dlgBan').close();
+    toast((info.name || 'They') + ' is banned at all 4 stores.');
+    await loadBanIndex(true);
+    if (viewName() === 'visits') drawVisits(); else if (viewName() === 'bans') drawBans();
+  } catch (ex) { err.textContent = 'Couldn’t save the ban (' + (ex.code || ex.message) + ').'; $('#bGo').disabled = false; }
+});
+async function saveBan(b) {
+  const { fs, db } = cloud, now = Date.now(), day = dayKey(new Date(now));
+  const id = b.person || b.alt;
+  const batch = fs.writeBatch(db);
+  batch.set(fs.doc(db, 'idBans', id), {
+    person: b.person, alt: b.alt, name: b.name, first: b.first, last: b.last, age: b.age, sex: b.sex, height: b.height, eyes: b.eyes,
+    issuer: b.issuer, idLast4: b.idLast4, reason: b.reason, note: b.note.slice(0, 500), store: b.store, visit: b.visit, source: b.source,
+    active: true, by: cloud.user.email, at: fs.serverTimestamp(), atMs: now, day, liftedBy: null, liftedAtMs: null, liftNote: ''
+  });
+  // What a store computer sees when the same ID is scanned: no name, no note.
+  const key = { ban: id, active: true, reason: b.reason, store: b.store, since: day };
+  if (b.person) batch.set(fs.doc(db, 'idBanKeys', b.person), key);
+  if (b.alt) batch.set(fs.doc(db, 'idBanKeys', b.alt), key);
+  await batch.commit();
+}
+
+let liftBan = null;
+function openLift(b) {
+  liftBan = b;
+  $('#lfWho').textContent = (b.name || 'This person') + ' will be able to buy at all 4 stores again. The ban stays in the Lifted list.';
+  $('#lfNote').value = ''; $('#lfErr').textContent = ''; $('#lfGo').disabled = false;
+  $('#dlgLift').showModal();
+}
+$('#liftForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const b = liftBan; if (!b) return;
+  $('#lfGo').disabled = true;
+  try {
+    const { fs, db } = cloud, batch = fs.writeBatch(db);
+    batch.set(fs.doc(db, 'idBans', b.id), { active: false, liftedBy: cloud.user.email, liftedAtMs: Date.now(), liftNote: $('#lfNote').value.trim().slice(0, 300) }, { merge: true });
+    if (b.person) batch.set(fs.doc(db, 'idBanKeys', b.person), { active: false }, { merge: true });
+    if (b.alt) batch.set(fs.doc(db, 'idBanKeys', b.alt), { active: false }, { merge: true });
+    await batch.commit();
+    $('#dlgLift').close(); toast('Ban lifted for ' + (b.name || 'this person') + '.');
+    await loadBanIndex(true); drawBans();
+  } catch (ex) { $('#lfErr').textContent = 'Couldn’t lift the ban (' + (ex.code || ex.message) + ').'; $('#lfGo').disabled = false; }
+});
+
+/* ---------------- Bans ---------------- */
+const BS = { show: 'active' };
+$$('#viewBans .seg button').forEach(b => b.addEventListener('click', () => {
+  BS.show = b.dataset.bshow; $$('#viewBans .seg button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); drawBans();
+}));
+async function loadBans() {
+  if (!cloud.db || !isManager(cloud.user)) return;
+  $('#bRange').textContent = 'Loading…';
+  try { await loadBanIndex(true); drawBans(); }
+  catch (err) { $('#bRange').textContent = 'Couldn’t load the ban list (' + (err.code || err.message) + ').'; $('#bList').innerHTML = ''; }
+}
+function drawBans() {
+  const active = BS.show === 'active';
+  const list = BX.list.filter(b => !!b.active === active).sort((a, b) => active ? (b.atMs || 0) - (a.atMs || 0) : (b.liftedAtMs || 0) - (a.liftedAtMs || 0));
+  $('#bRange').textContent = active ? list.length + (list.length === 1 ? ' person is' : ' people are') + ' banned at all 4 stores.' : list.length + (list.length === 1 ? ' ban has' : ' bans have') + ' been lifted.';
+  if (!list.length) { $('#bList').innerHTML = `<li class="empty">${active ? 'Nobody is banned. Ban someone from Visits, or use Add a ban.' : 'No lifted bans.'}</li>`; return; }
+  $('#bList').innerHTML = list.map(b => {
+    const d = new Date(b.atMs || Date.now());
+    const match = b.source === 'manual' ? 'Matches name and birth date' : 'Matches their ID';
+    return `<li class="v-row"><div class="v-when">${esc(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))}<small>${d.getFullYear()}</small></div>` +
+      `<div class="v-main"><p class="v-name">${esc(b.name || 'No name')} <span class="chip ${active ? 'ban' : 'off'}">${esc(BAN_LABEL[b.reason] || 'Banned')}</span></p>` +
+      `<p class="v-meta">${esc(describe(b))}</p>` + (b.note ? `<p class="v-note">${esc(b.note)}</p>` : '') +
+      `<p class="v-meta">${esc(['Happened at ' + (storeName(b.store) || 'unknown store'), 'Banned by ' + (b.by || 'unknown'), match].join(' · '))}</p>` +
+      (active ? '' : `<p class="v-meta">${esc('Lifted ' + (b.liftedAtMs ? fmtDate(b.liftedAtMs) : '') + ' by ' + (b.liftedBy || 'unknown') + (b.liftNote ? ': ' + b.liftNote : ''))}</p>`) +
+      `</div><div class="v-act">` + (b.person || b.alt ? `<button class="btn-plain small" data-bhist="${esc(b.id)}">Visits</button>` : '') +
+      (active ? `<button class="btn-plain small" data-lift="${esc(b.id)}">Lift ban</button>` : `<button class="btn-danger small" data-reban="${esc(b.id)}">Ban again</button>`) + `</div></li>`;
+  }).join('');
+}
+$('#bList').addEventListener('click', e => {
+  const t = e.target.closest('[data-lift],[data-reban],[data-bhist]'); if (!t) return;
+  const b = BX.list.find(x => x.id === (t.dataset.lift || t.dataset.reban || t.dataset.bhist)); if (!b) return;
+  if (t.dataset.lift) openLift(b);
+  else if (t.dataset.reban) openBan({ mode: 'reban', ban: b });
+  else openPerson(Object.assign({}, b, { id: 'ban-' + b.id, _ban: b }));
+});
+
+/* ---------------- Reports ---------------- */
+$$('#viewReports .seg button').forEach(b => b.addEventListener('click', () => {
+  R.range = b.dataset.range; $$('#viewReports .seg button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); loadReports();
 }));
 $('#rStore').addEventListener('change', e => { R.store = e.target.value; drawReports(); });
 $('#denMore').addEventListener('click', () => { R.allDenials = !R.allDenials; drawReports(); });
@@ -1235,7 +1717,7 @@ const n0 = x => x || 0;
 const pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '–';
 const fmtDay = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
 const hourLbl = h => { h = +h; return (h % 12 || 12) + (h < 12 ? 'a' : 'p'); };
-const REASON = { under_age: 'Under 21', expired: 'Expired ID' };
+const REASON = { under_age: 'Under 21', expired: 'Expired ID', banned: 'Banned' };
 const issuerLabel = k => k === 'manual' ? 'Manual check (no barcode)' : k === 'unknown' ? 'Unrecognized' : (C.BY_ABBR[k] || k);
 
 function drawReports() {
@@ -1433,7 +1915,7 @@ window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() =
 /* ---------------- start ---------------- */
 renderTally(); refreshStatus(); route(); renderCloud(); initCloud();
 if (!S.store) setTimeout(() => openDialog('setup'), 300);
-window.IDCheckDebug = { handleRaw, drawReports, R, S }; // used for testing
+window.IDCheckDebug = { handleRaw, drawReports, R, S, clearRecent: () => recent.clear() }; // used for testing
 })();
 </script>
 </body>
