@@ -18,7 +18,8 @@ Bans match the ID number and also the name and birth date, so a new license numb
 
 - **Visits** (managers only): name, age, sex, height, eye color, issuing state, last 4 of the ID number, store, station, time and result. Kept until deleted.
 - **Scan counts** (Reports): age, result, reason, issuing state, store, station and time. No names.
-- **Never saved**: birth dates, full ID numbers and addresses. Visits and bans hold a one-way fingerprint of the ID number and of name plus birth date, so they can be matched later without storing the numbers.
+- **Home ZIP counts** (Reports map): how many scans came from each 5-digit ZIP code, per store per day. The ZIP is never saved with a scan or a visit.
+- **Never saved**: birth dates, full ID numbers and street addresses. Visits and bans hold a one-way fingerprint of the ID number and of name plus birth date, so they can be matched later without storing the numbers.
 - Store computers can check whether a scanned ID is banned, but can't list the ban list or read names.
 
 New York's rule 9 NYCRR 123.10(d)(5) limits recording customer personal information without consent, beyond what is typically collected in a sale. Confirm this use with TTA compliance.
@@ -29,3 +30,9 @@ New York's rule 9 NYCRR 123.10(d)(5) limits recording customer personal informat
 2. Create a Firestore database and paste `firestore.rules` into its Rules tab.
 3. Paste the web app config into `FIREBASE_CONFIG` near the top of the second script in `index.html`. Keep `MANAGER_EMAILS` the same as the list in the rules.
 4. On each store computer, open the page and pick the store. A link like `?store=usq` picks it automatically.
+
+## Reports history and map
+
+Reports can show the last 90 days or all time. SoHo's history from Aug 2025 to Nov 8, 2026 was imported from the old IDVisor scanner as daily totals only (no names or ID numbers). That export skips some days.
+
+The map panel shows where customers live: a circle per home ZIP code in New York City, and every scan shaded by the state on the ID. `geo.json` holds the map shapes only (borough outlines, ZIP code positions from the `zipcodes` package, US states from `us-atlas`). It has no customer data.
