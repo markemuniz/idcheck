@@ -1,8 +1,10 @@
 rules_version = '2';
 
 // TTA ID Check: paste into Firebase console > Firestore Database > Rules.
-// Stations sign in anonymously and can only ADD records. Only the manager
-// emails below can READ reports. Nobody can edit or delete records.
+// Store computers sign in anonymously. They can only ADD scans and visits,
+// and can look up one ban key at a time (they can't list the ban list).
+// Only the manager emails below can read visits, reports and bans, or
+// ban and unban. Nobody can delete records.
 // Keep managerEmails in sync with MANAGER_EMAILS in index.html.
 
 service cloud.firestore {
@@ -17,7 +19,7 @@ service cloud.firestore {
     }
     function validStore(s) { return s in ['soho', 'usq', 'dtbk', 'fifth']; }
 
-    // One record per scan. No names, birth dates, ID numbers or addresses.
+    // One record per scan, for counts. No names, birth dates, ID numbers or addresses.
     match /idScans/{id} {
       allow create: if signedIn()
         && validStore(request.resource.data.store)
@@ -29,12 +31,48 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // One record per barcode scan with who it was, for looking people up
+    // and banning later. Name, description and last 4 of the ID only.
+    // person/alt are one-way fingerprints, not the ID number or birth date.
+    match /idVisits/{id} {
+      allow create: if signedIn()
+        && validStore(request.resource.data.store)
+        && request.resource.data.result in ['clear', 'deny', 'check']
+        && request.resource.data.keys().hasOnly(['at', 'ts', 'savedAt', 'day', 'hour', 'time', 'store', 'station',
+             'result', 'reason', 'age', 'issuer', 'docType', 'scan', 'v',
+             'name', 'first', 'last', 'lastKey', 'sex', 'height', 'eyes', 'idLast4', 'person', 'alt', 'banned']);
+      allow read: if isManager();
+      allow update, delete: if false;
+    }
+
     // Per-store daily totals. The Reports page reads only these.
     match /idDaily/{id} {
       allow create, update: if signedIn()
         && validStore(request.resource.data.store)
         && id == request.resource.data.day + '_' + request.resource.data.store;
       allow read: if isManager();
+      allow delete: if false;
+    }
+
+    // The ban list, with names and notes. Managers only.
+    match /idBans/{id} {
+      allow read: if isManager();
+      allow create, update: if isManager()
+        && request.resource.data.active is bool
+        && request.resource.data.keys().hasOnly(['person', 'alt', 'name', 'first', 'last', 'age', 'sex', 'height',
+             'eyes', 'issuer', 'idLast4', 'reason', 'note', 'store', 'visit', 'source', 'active', 'by', 'at',
+             'atMs', 'day', 'liftedBy', 'liftedAtMs', 'liftNote']);
+      allow delete: if false;
+    }
+
+    // What a store computer checks on every scan. Keyed by the fingerprint,
+    // so it can only be fetched by someone holding that ID. No names.
+    match /idBanKeys/{key} {
+      allow get: if signedIn();
+      allow list: if isManager();
+      allow create, update: if isManager()
+        && request.resource.data.active is bool
+        && request.resource.data.keys().hasOnly(['ban', 'active', 'reason', 'store', 'since']);
       allow delete: if false;
     }
   }
