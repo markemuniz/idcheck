@@ -182,6 +182,13 @@ dialog::backdrop{background:rgba(9,15,30,.62)}
 .legend{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin:4px 0 10px}
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .legend i{display:inline-block;width:14px;height:3px;border-radius:2px}
+.heat{display:grid;gap:2px;font-size:12px;color:var(--muted)}
+.heat .c{height:26px;border-radius:3px;background:#EDF0F4}
+.heat .rl{display:flex;align-items:center;padding-right:8px;font-weight:600;color:var(--ink)}
+.heat .cl{text-align:center;padding-top:4px}
+.ramp{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-top:10px}
+.ramp span.bar{display:flex;gap:2px}
+.ramp span.bar i{display:block;width:18px;height:10px;border-radius:2px}
 .hbar{display:grid;grid-template-columns:minmax(110px,170px) 1fr 70px;align-items:center;gap:12px;font-size:14px;padding:5px 0}
 .hbar .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hbar .fill{height:10px;background:var(--s1);border-radius:0 4px 4px 0;min-width:2px}
@@ -286,6 +293,11 @@ details.numbers table{margin-top:8px}
       <div class="rpanel"><h2>Busiest hours</h2><p class="rp-sub">Scans by hour of day, all days in range</p><div class="chart" id="cHours"></div><details class="numbers"><summary>Show numbers</summary><div class="tablewrap"><table class="rtable" id="nHours"></table></div></details></div>
       <div class="rpanel"><h2>Where IDs are from</h2><p class="rp-sub">Issuing state or province</p><div id="cIssuers"></div></div>
       <div class="rpanel"><h2>Customer ages</h2><p class="rp-sub">Age at time of scan</p><div class="chart" id="cAges"></div><details class="numbers"><summary>Show numbers</summary><div class="tablewrap"><table class="rtable" id="nAges"></table></div></details></div>
+    </div>
+    <div class="rpanel" id="pWeek">
+      <h2>Busiest times of the week</h2><p class="rp-sub" id="wkSub">Average scans per hour, by day of week</p>
+      <div class="chart" id="cWeek"></div>
+      <details class="numbers"><summary>Show numbers</summary><div class="tablewrap"><table class="rtable" id="nWeek"></table></div></details>
     </div>
     <div class="rpanel">
       <h2>Denials</h2><p class="rp-sub">Newest first. Only age, reason and issuing state are kept.</p>
@@ -1150,6 +1162,10 @@ function drawReports() {
     $('#nHours').innerHTML = '<thead><tr><th>Hour</th><th class="num">Scans</th></tr></thead><tbody>' + labels.map((l, i) => `<tr><td>${l}</td><td class="num">${vals[i]}</td></tr>`).join('') + '</tbody>';
   } else { $('#cHours').innerHTML = '<p class="empty">No scans in this range yet.</p>'; $('#nHours').innerHTML = ''; }
 
+  // day of week x hour (average per day of that weekday)
+  $('#pWeek').hidden = days.length < 7;
+  if (days.length >= 7) weekHeat(docs, days);
+
   // issuers
   const iss = sumMap(docs, 'issuer'); const list = Object.keys(iss).map(k => ({ k, n: iss[k] })).sort((a, b) => b.n - a.n);
   const top = list.slice(0, 8), rest = list.slice(8).reduce((a, x) => a + x.n, 0);
@@ -1175,6 +1191,43 @@ function drawReports() {
   $('#tDenials').innerHTML = den.length ? '<thead><tr><th>Date</th><th>Time</th><th>Store</th><th>Station</th><th>Reason</th><th class="num">Age</th><th>ID from</th></tr></thead><tbody>' +
     shownDen.map(x => `<tr><td>${fmtDay(x.day)}</td><td>${esc(x.time)}</td><td>${esc(storeName(x.store))}</td><td>${esc(x.station)}</td><td>${esc(REASON[x.reason] || x.reason)}</td><td class="num">${x.age == null ? '' : x.age}</td><td>${esc(issuerLabel(x.issuer))}</td></tr>`).join('') + '</tbody>'
     : '<tbody><tr><td class="empty">No denials in this range.</td></tr></tbody>';
+}
+
+const RAMP = ['#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#2a78d6', '#256abf', '#1c5cab', '#184f95', '#0d366b'];
+const WD = [['Mon', 1], ['Tue', 2], ['Wed', 3], ['Thu', 4], ['Fri', 5], ['Sat', 6], ['Sun', 0]];
+function weekHeat(docs, days) {
+  const el = $('#cWeek'), nWd = {}, grid = {};
+  days.forEach(k => { const [y, m, d] = k.split('-').map(Number); const w = new Date(y, m - 1, d).getDay(); nWd[w] = (nWd[w] || 0) + 1; });
+  let lo = 24, hi = -1;
+  docs.forEach(doc => {
+    const [y, m, d] = doc.day.split('-').map(Number), w = new Date(y, m - 1, d).getDay();
+    Object.keys(doc.hour || {}).forEach(h => { const v = doc.hour[h] || 0; if (!v) return; const hn = +h; grid[w + '_' + hn] = (grid[w + '_' + hn] || 0) + v; lo = Math.min(lo, hn); hi = Math.max(hi, hn); });
+  });
+  if (hi < 0) { el.innerHTML = '<p class="empty">No scans in this range yet.</p>'; $('#nWeek').innerHTML = ''; return; }
+  const avg = (w, h) => nWd[w] ? (grid[w + '_' + h] || 0) / nWd[w] : 0;
+  let max = 0; WD.forEach(([, w]) => { for (let h = lo; h <= hi; h++) max = Math.max(max, avg(w, h)); });
+  const hours = []; for (let h = lo; h <= hi; h++) hours.push(h);
+  let peak = { v: -1 };
+  let html = `<div class="heat" style="grid-template-columns:44px repeat(${hours.length},minmax(14px,1fr))">`;
+  WD.forEach(([name, w]) => {
+    html += `<div class="rl">${name}</div>`;
+    hours.forEach(h => {
+      const v = avg(w, h), bin = v > 0 ? Math.min(RAMP.length - 1, Math.floor(v / max * RAMP.length)) : -1;
+      if (v > peak.v) peak = { v, name, h };
+      html += `<div class="c" data-t="${name} ${hourLbl(h)}: ${v >= 10 ? Math.round(v) : v.toFixed(1)} scans on average" style="${bin >= 0 ? 'background:' + RAMP[bin] : ''}"></div>`;
+    });
+  });
+  html += '<div></div>' + hours.map((h, i) => `<div class="cl">${i % 2 === 0 ? hourLbl(h) : ''}</div>`).join('') + '</div>';
+  html += `<div class="ramp">Fewer<span class="bar">${RAMP.map(c => `<i style="background:${c}"></i>`).join('')}</span>More</div>`;
+  el.innerHTML = html;
+  $('#wkSub').textContent = 'Average scans per hour, by day of week. Busiest: ' + { Mon: 'Mondays', Tue: 'Tuesdays', Wed: 'Wednesdays', Thu: 'Thursdays', Fri: 'Fridays', Sat: 'Saturdays', Sun: 'Sundays' }[peak.name] + ' at ' + hourLbl(peak.h) + '.';
+  const tip = tipEl(el);
+  el.querySelectorAll('.c').forEach(c => {
+    c.addEventListener('mouseenter', () => { tip.textContent = c.dataset.t; tip.style.left = (c.offsetLeft + c.offsetWidth / 2) + 'px'; tip.style.top = c.offsetTop + 'px'; tip.classList.add('on'); c.style.outline = '2px solid var(--ink)'; });
+    c.addEventListener('mouseleave', () => { tip.classList.remove('on'); c.style.outline = ''; });
+  });
+  $('#nWeek').innerHTML = '<thead><tr><th>Day</th>' + hours.map(h => `<th class="num">${hourLbl(h)}</th>`).join('') + '</tr></thead><tbody>' +
+    WD.map(([name, w]) => `<tr><td>${name}</td>` + hours.map(h => `<td class="num">${Math.round(avg(w, h))}</td>`).join('') + '</tr>').join('') + '</tbody>';
 }
 
 $('#rCsv').addEventListener('click', () => {
