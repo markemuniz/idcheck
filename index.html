@@ -231,7 +231,15 @@ details.numbers table{margin-top:8px}
 .maps{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:22px;margin-top:12px;align-items:start}
 .m-h{font-size:14px;font-weight:600;margin:0 0 6px}
 .map{position:relative}
-.map svg{display:block;width:100%;height:auto}
+.map svg{display:block;width:100%;height:auto;-webkit-user-select:none;user-select:none}
+.map.zoomed svg{cursor:grab}
+.map.dragging svg{cursor:grabbing}
+.map .bo,.map .zb,.map .st{vector-effect:non-scaling-stroke}
+.map .zt{font-size:11px;font-weight:700;fill:var(--ink);stroke:#fff;stroke-width:3px;paint-order:stroke;dominant-baseline:central;pointer-events:none}
+.m-zoom{position:absolute;top:6px;right:6px;z-index:1;display:flex;flex-direction:column;gap:4px}
+.m-zoom button{width:34px;height:34px;padding:0;border:1px solid var(--rule);border-radius:7px;background:#fff;color:var(--ink);font-size:19px;font-weight:700;line-height:1;box-shadow:0 1px 3px rgba(24,33,58,.12);cursor:pointer}
+.m-zoom button:disabled{opacity:.35;cursor:default}
+.m-zoom button:focus-visible{outline:2px solid var(--s1);outline-offset:1px}
 .map .bo{fill:#E3E8EE;stroke:#B9C3D0;stroke-width:.8}
 .map .zb{fill:var(--s1);fill-opacity:.6;stroke:#fff;stroke-width:.8}
 .map .st{stroke:#fff;stroke-width:.7}
@@ -404,7 +412,7 @@ details.numbers table{margin-top:8px}
       <h2>Where customers live</h2><p class="rp-sub" id="mSub">Home ZIP code from the ID</p>
       <div id="mOrigin"></div>
       <div class="maps">
-        <div><h3 class="m-h">New York City, by home ZIP code</h3><div class="map" id="mNyc"></div></div>
+        <div><h3 class="m-h">New York City, by home ZIP code</h3><div class="map" id="mNyc"></div><p class="m-note">Zoom with + and −, a double-click, a pinch or Ctrl + scroll. Drag to move around. ZIP codes show up as you zoom in.</p></div>
         <div><h3 class="m-h">Every scan, by the state on the ID</h3><div class="map" id="mUs"></div><div class="m-ramp" id="mUsRamp"></div><p class="m-note" id="mUsNote"></p></div>
       </div>
       <details class="numbers"><summary>Show numbers</summary><div class="m-tables"><div class="tablewrap"><table class="rtable" id="nBoro"></table></div><div class="tablewrap"><table class="rtable" id="nZips"></table></div></div></details>
@@ -872,7 +880,7 @@ const BAN_REASONS = [
   ['other', 'Other']
 ];
 
-const APP_VERSION = '1.3';
+const APP_VERSION = '1.4';
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const DEDUPE_MS = 120000; // same card again within 2 minutes is counted once
 const BAN_WAIT_MS = 1500; // how long a scan waits on the ban list before showing
@@ -1939,7 +1947,7 @@ const CA_PROV = new Set(['AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'NT', 'NU', 'ON', '
 function mapTips(el) {
   const tip = tipEl(el), hide = () => { tip.classList.remove('on'); tip.style.left = '0px'; tip.style.top = '0px'; };
   el.onmousemove = ev => {
-    const t = ev.target.closest && ev.target.closest('[data-t]');
+    const t = !el._dragging && ev.target.closest && ev.target.closest('[data-t]');
     if (!t) { hide(); return; }
     const b = el.getBoundingClientRect();
     tip.textContent = t.getAttribute('data-t');
@@ -1947,6 +1955,70 @@ function mapTips(el) {
     tip.style.left = Math.min(Math.max(ev.clientX - b.left, half), Math.max(half, b.width - half)) + 'px'; tip.style.top = (ev.clientY - b.top) + 'px'; tip.classList.add('on');
   };
   el.onmouseleave = hide;
+}
+/* Map zoom: + and − buttons, double-click (Shift to zoom out), Ctrl or Cmd + scroll
+   (and trackpad pinch), two-finger pinch on touch screens, drag to move when zoomed. */
+function zoomable(el, opt) {
+  const svg = el.querySelector('svg'); if (!svg) return;
+  const W = opt.w, H = opt.h, maxK = opt.maxK || 10, minW = W / maxK;
+  const v = el._view && el._view.W === W ? el._view : { x: 0, y: 0, w: W, W };
+  const ctr = document.createElement('div'); ctr.className = 'm-zoom';
+  ctr.innerHTML = '<button type="button" data-z="in" aria-label="Zoom in" title="Zoom in">+</button>' +
+    '<button type="button" data-z="out" aria-label="Zoom out" title="Zoom out">−</button>' +
+    '<button type="button" data-z="reset" aria-label="Show the whole map" title="Show the whole map">⟲</button>';
+  el.appendChild(ctr);
+  const apply = () => {
+    v.w = Math.min(W, Math.max(minW, v.w)); const h = v.w * H / W;
+    v.x = Math.min(W - v.w, Math.max(0, v.x)); v.y = Math.min(H - h, Math.max(0, v.y));
+    svg.setAttribute('viewBox', `${v.x.toFixed(2)} ${v.y.toFixed(2)} ${v.w.toFixed(2)} ${h.toFixed(2)}`);
+    const k = W / v.w, zoomed = k > 1.01; el._view = v;
+    el.classList.toggle('zoomed', zoomed);
+    // Zoomed in, one finger moves the map; zoomed out, it scrolls the page.
+    svg.style.touchAction = zoomed ? 'none' : 'pan-x pan-y';
+    ctr.querySelector('[data-z="in"]').disabled = k >= maxK - 0.01;
+    ctr.querySelector('[data-z="out"]').disabled = !zoomed;
+    ctr.querySelector('[data-z="reset"]').disabled = !zoomed;
+    if (opt.onZoom) opt.onZoom(svg, k, svg.getBoundingClientRect().width / W);
+  };
+  const toUser = (cx, cy) => { const r = svg.getBoundingClientRect(); return [v.x + (cx - r.left) / r.width * v.w, v.y + (cy - r.top) / r.width * v.w]; };
+  const zoomAt = (ux, uy, f) => { const nw = Math.min(W, Math.max(minW, v.w / f)), s = nw / v.w; v.x = ux - (ux - v.x) * s; v.y = uy - (uy - v.y) * s; v.w = nw; apply(); };
+  ctr.addEventListener('click', e => {
+    const b = e.target.closest('[data-z]'); if (!b) return;
+    if (b.dataset.z === 'reset') { v.x = 0; v.y = 0; v.w = W; apply(); }
+    else zoomAt(v.x + v.w / 2, v.y + v.w * H / W / 2, b.dataset.z === 'in' ? 2 : 0.5);
+  });
+  svg.addEventListener('dblclick', e => { e.preventDefault(); const [ux, uy] = toUser(e.clientX, e.clientY); zoomAt(ux, uy, e.shiftKey ? 0.5 : 2); });
+  svg.addEventListener('wheel', e => {
+    if (!e.ctrlKey && !e.metaKey) return; // plain scrolling still scrolls the page
+    e.preventDefault(); const [ux, uy] = toUser(e.clientX, e.clientY); zoomAt(ux, uy, Math.exp(-Math.max(-60, Math.min(60, e.deltaY)) * 0.01));
+  }, { passive: false });
+  const pts = new Map(); let pinch = null;
+  svg.addEventListener('pointerdown', e => {
+    if (e.button > 0) return;
+    pts.set(e.pointerId, [e.clientX, e.clientY]); pinch = null;
+    if (W / v.w > 1.01 || pts.size > 1) { try { svg.setPointerCapture(e.pointerId); } catch (err) {} }
+  });
+  svg.addEventListener('pointermove', e => {
+    const prev = pts.get(e.pointerId); if (!prev) return;
+    pts.set(e.pointerId, [e.clientX, e.clientY]);
+    const r = svg.getBoundingClientRect(), sc = v.w / r.width;
+    if (pts.size === 1) {
+      if (W / v.w <= 1.01 || !(e.buttons & 1)) return;
+      v.x -= (e.clientX - prev[0]) * sc; v.y -= (e.clientY - prev[1]) * sc;
+      el._dragging = true; el.classList.add('dragging'); apply();
+    } else if (pts.size === 2) {
+      const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      if (pinch && pinch.d > 0) {
+        v.x -= (mid[0] - pinch.mid[0]) * sc; v.y -= (mid[1] - pinch.mid[1]) * sc;
+        const [ux, uy] = toUser(mid[0], mid[1]); zoomAt(ux, uy, d / pinch.d);
+      }
+      el._dragging = true; pinch = { d, mid };
+    }
+  });
+  const up = e => { pts.delete(e.pointerId); pinch = null; if (!pts.size) { el.classList.remove('dragging'); setTimeout(() => { el._dragging = false; }, 0); } };
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => svg.addEventListener(t, up));
+  el._zoomApply = apply;
+  apply();
 }
 function drawMap(docs) {
   const g = GEO.data;
@@ -1990,10 +2062,23 @@ function drawMap(docs) {
   const zmax = pts.length ? pts[0].n : 1, zlabel = p => p.z + (p.b ? ' ' + BORO_NAME[p.b] : p.c ? ' ' + p.c : '');
   let s = `<svg viewBox="0 0 ${g.nyc.w} ${g.nyc.h}" role="img" aria-label="Map of New York City with a circle for each home ZIP code, sized by number of scans">`;
   Object.values(g.nyc.boros).forEach(d => { s += `<path class="bo" d="${d}"/>`; });
-  pts.forEach(p => { s += `<circle class="zb" cx="${p.x}" cy="${p.y}" r="${Math.max(2, Math.sqrt(p.n / zmax) * 24).toFixed(1)}" data-t="${esc(zlabel(p) + ': ' + p.n.toLocaleString() + ' scan' + (p.n === 1 ? '' : 's'))}"/>`; });
-  Object.entries(g.nyc.labels).forEach(([n, [x, y]]) => { s += `<text x="${x}" y="${y}" text-anchor="middle">${esc(n)}</text>`; });
-  s += `<text x="${g.nyc.nj[0]}" y="${g.nyc.nj[1]}" text-anchor="middle">New Jersey</text></svg>`;
+  const rad = p => Math.max(2, Math.sqrt(p.n / zmax) * 24).toFixed(1);
+  pts.forEach(p => { s += `<circle class="zb" cx="${p.x}" cy="${p.y}" r="${rad(p)}" data-r="${rad(p)}" data-t="${esc(zlabel(p) + ': ' + p.n.toLocaleString() + ' scan' + (p.n === 1 ? '' : 's'))}"/>`; });
+  pts.forEach(p => { s += `<text class="zt" x="${p.x}" y="${p.y}" text-anchor="middle" data-r="${rad(p)}" style="display:none">${p.z}</text>`; });
+  Object.entries(g.nyc.labels).forEach(([n, [x, y]]) => { s += `<text class="bl" x="${x}" y="${y}" text-anchor="middle">${esc(n)}</text>`; });
+  s += `<text class="bl" x="${g.nyc.nj[0]}" y="${g.nyc.nj[1]}" text-anchor="middle">New Jersey</text></svg>`;
   $('#mNyc').innerHTML = s; mapTips($('#mNyc'));
+  zoomable($('#mNyc'), { w: g.nyc.w, h: g.nyc.h, maxK: 12, onZoom: (svg, k, sc) => {
+    // Circles shrink a little as you zoom so crowded areas separate; labels stay the same size on screen.
+    const sq = Math.sqrt(k);
+    svg.querySelectorAll('circle.zb').forEach(c => c.setAttribute('r', (+c.dataset.r / sq).toFixed(2)));
+    svg.querySelectorAll('text.bl').forEach(t => { t.style.fontSize = (17 / k) + 'px'; t.style.strokeWidth = (4 / k) + 'px'; });
+    svg.querySelectorAll('text.zt').forEach(t => {
+      const show = sc > 0 && k >= 2.5 && (+t.dataset.r / sq) * k * sc >= 12;
+      t.style.display = show ? '' : 'none';
+      if (show) { t.style.fontSize = (11 / (k * sc)) + 'px'; t.style.strokeWidth = (3 / (k * sc)) + 'px'; }
+    });
+  } });
 
   // US: every scan, shaded by the state on the ID (log scale, since New York dwarfs the rest)
   const iss = sumMap(docs, 'issuer'), usTot = g.us.states.reduce((a, x) => a + n0(iss[x.s]), 0);
@@ -2005,6 +2090,7 @@ function drawMap(docs) {
   });
   u += '</svg>';
   $('#mUs').innerHTML = u; mapTips($('#mUs'));
+  zoomable($('#mUs'), { w: g.us.w, h: g.us.h, maxK: 8 });
   const nStates = g.us.states.filter(x => x.s.length === 2 && n0(iss[x.s]) > 0 && x.s !== 'DC' && x.s !== 'PR').length;
   let canAll = 0; Object.keys(iss).forEach(k => { if (CA_PROV.has(k)) canAll += iss[k]; });
   $('#mUsRamp').innerHTML = `<span>Fewer</span><span class="sw">${RAMP.map(c => `<i style="background:${c}"></i>`).join('')}</span><span>More</span>`;
@@ -2092,7 +2178,11 @@ function lineChart(el, legendEl, xLabels, series) {
   el._redraw = () => lineChart(el, legendEl, xLabels, series);
 }
 let rz = 0;
-window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (!$('#viewReports').hidden) ['#cDays', '#cHours', '#cAges'].forEach(s => { const el = $(s); if (el._redraw && el.offsetParent) el._redraw(); }); }, 150); });
+window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => {
+  if ($('#viewReports').hidden) return;
+  ['#cDays', '#cHours', '#cAges'].forEach(s => { const el = $(s); if (el._redraw && el.offsetParent) el._redraw(); });
+  ['#mNyc', '#mUs'].forEach(s => { const el = $(s); if (el._zoomApply && el.offsetParent) el._zoomApply(); });
+}, 150); });
 
 /* ---------------- start ---------------- */
 renderTally(); refreshStatus(); route(); renderCloud(); initCloud();
