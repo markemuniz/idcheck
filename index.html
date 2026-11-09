@@ -838,7 +838,7 @@ const BAN_REASONS = [
   ['other', 'Other']
 ];
 
-const APP_VERSION = '1.1';
+const APP_VERSION = '1.2';
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const DEDUPE_MS = 120000; // same card again within 2 minutes is counted once
 const BAN_WAIT_MS = 1500; // how long a scan waits on the ban list before showing
@@ -946,7 +946,34 @@ setInterval(refreshStatus, 1500);
 /* ---------------- keyboard-wedge capture ----------------
    The scanner "types" the barcode. AAMVA data starts with "@". Control
    characters can arrive as Enter, Tab, Ctrl+letter, or Alt+numpad codes. */
-const IDLE_MS = 220;
+const IDLE_MS = 220;     // no header to go by: finish after this much quiet
+const DONE_MS = 80;      // header says all the data is in: finish almost right away
+const PARTIAL_MS = 1500; // header says data is still missing: ride out scanner pauses
+/* The AAMVA header lists each subfile's offset and length, so we can tell
+   whether the whole barcode has arrived. That lets a complete scan finish
+   sooner, and a scan the scanner pauses in the middle of not get cut in two. */
+function scanProgress(buf) {
+  const at = buf.indexOf('@'); if (at < 0) return null;
+  const t = buf.slice(at);
+  // Scanners set to drop line breaks send the data shorter than the header
+  // says, so there's nothing to count against. (A trailing Enter doesn't count.)
+  if ((t.slice(0, -1).match(/\n/g) || []).length < 2) return t.length < 60 ? { pending: true } : null;
+  const hm = /(?:ANSI|AAMVA) ?(\d{6})(\d{2})/.exec(t.slice(0, 40));
+  if (!hm) return t.length < 60 ? { pending: true } : null;
+  let pos = hm.index + hm[0].length;
+  if (+hm[2] >= 2) pos += 2; // jurisdiction version
+  const n = parseInt(t.substr(pos, 2), 10);
+  if (t.length < pos + 2) return { pending: true };
+  if (!(n >= 1 && n <= 10)) return null;
+  pos += 2;
+  let end = 0;
+  for (let i = 0; i < n; i++) {
+    const m = /^[A-Z]{2}(\d{4})(\d{4})$/.exec(t.substr(pos + i * 10, 10));
+    if (!m) return t.length < pos + n * 10 ? { pending: true } : null;
+    end = Math.max(end, +m[1] + +m[2]);
+  }
+  return { done: t.length >= end - 3, have: t.length, need: end };
+}
 function inField(el) {
   if (!el) return false;
   const t = el.tagName;
@@ -955,7 +982,11 @@ function inField(el) {
   return false;
 }
 function anyDialogOpen() { return $$('dialog').some(d => d.open); }
-function arm() { clearTimeout(Scan.timer); Scan.timer = setTimeout(finishScan, IDLE_MS); }
+function arm() {
+  clearTimeout(Scan.timer);
+  const p = scanProgress(Scan.buf);
+  Scan.timer = setTimeout(finishScan, !p ? IDLE_MS : p.done ? DONE_MS : PARTIAL_MS);
+}
 document.addEventListener('keydown', e => {
   if (e.isComposing) return;
   const k = e.key, altDigit = e.altKey && /^Numpad\d$/.test(e.code);
@@ -1032,6 +1063,13 @@ async function handleRaw(raw, source) {
   if (viewName() !== 'scan') location.hash = '';
   const seq = ++scanSeq;
   const r = C.analyze(raw);
+  // A short barcode that isn't ID data (a store tag, the small barcode on
+  // some cards): ask for a rescan instead of counting it as flagged.
+  if (!r.recognized && raw.replace(/\s/g, '').length < 150) {
+    showResult(r, { status: 'check', miss: true, reason: 'wrong_barcode', main: 'TRY AGAIN', sub: 'Wrong barcode', flags: [], age: null,
+      head: "That wasn't the ID barcode", why: 'Aim at the wide barcode on the back of the license or state ID. No barcode, or it won’t scan? Use Manual check.' }, 'Not counted.', raw, seq);
+    return;
+  }
   let v = C.verdict(r, { minAge: S.minAge, today: new Date() });
   let keys = { person: null, alt: null }, ban = { state: 'skip' }, late = null;
   try { keys = await personKeys(r); } catch (e) { console.warn('ID Check keys failed', e); }
@@ -1061,13 +1099,13 @@ function showResult(r, v, note, raw, seq) {
   $('#rHead').textContent = v.head; $('#rReason').textContent = v.why;
   const fl = $('#flags'); fl.innerHTML = '';
   v.flags.forEach(f => { const li = document.createElement('li'); li.className = f.level; li.textContent = f.text; fl.appendChild(li); });
-  $('#match').hidden = v.status === 'deny';
+  $('#match').hidden = v.status === 'deny' || !!v.miss;
   $('#rNote').textContent = note || '';
   page.classList.remove('stamped'); void page.offsetWidth; page.classList.add('stamped');
   SOUND[v.status]();
 
   // details
-  $('#detIdle').hidden = true; $('#detFull').hidden = false;
+  $('#detIdle').hidden = !v.miss; $('#detFull').hidden = !!v.miss;
   const nm = r.name || {};
   $('#dName').textContent = r.manual ? r.docLabel : ([nm.first, nm.middle, nm.last].filter(Boolean).join(' ') + (nm.suffix ? ' ' + nm.suffix : '')) || 'Name not in barcode';
   const rows = [];
@@ -1085,7 +1123,7 @@ function showResult(r, v, note, raw, seq) {
     if (r.idLast4) rows.push(['ID number', 'Ends in ' + r.idLast4, '']);
   }
   if (r.manual) rows.push(['Checked', 'By hand', 'Dates typed in by staff']);
-  $('#facts').innerHTML = rows.map(([k, val, sub]) => `<dt>${esc(k)}</dt><dd>${esc(val)}${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</dd>`).join('');
+  $('#facts').innerHTML = v.miss ? '' : rows.map(([k, val, sub]) => `<dt>${esc(k)}</dt><dd>${esc(val)}${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</dd>`).join('');
 
   // raw (troubleshooting only, never saved)
   if (S.showRaw && raw) {
