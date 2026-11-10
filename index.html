@@ -220,6 +220,18 @@ dialog::backdrop{background:rgba(9,15,30,.62)}
 .hbar .v{text-align:right;font-variant-numeric:tabular-nums}
 .hbar .v small{color:var(--muted);margin-left:4px}
 details.numbers{margin-top:8px}
+.r-fold>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.r-fold>summary::-webkit-details-marker{display:none}
+.r-fold>summary:focus-visible{outline:2px solid var(--s1);outline-offset:4px;border-radius:6px}
+.r-fold>summary .rp-sub{display:block;margin:0}
+.r-fold[open]>summary{margin-bottom:12px}
+.rf-n{color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums;margin-left:4px}
+.rf-tog{flex:none;font-size:14px;font-weight:700;color:var(--s1-strong);border:1px solid var(--rule);background:#fff;border-radius:999px;padding:6px 14px}
+.rf-tog::before{content:'';display:inline-block;width:6px;height:6px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);margin:0 9px 0 0;vertical-align:3px}
+.rf-tog::after{content:'Show'}
+.r-fold[open] .rf-tog::before{transform:rotate(-135deg);vertical-align:-1px}
+.r-fold[open] .rf-tog::after{content:'Hide'}
+.r-fold>summary:hover .rf-tog{border-color:var(--s1)}
 details.numbers summary{cursor:pointer;color:var(--muted);font-size:13px}
 details.numbers table{margin-top:8px}
 .r-src{margin:-10px 0 0;color:var(--on-cover-muted);font-size:14px}
@@ -428,11 +440,11 @@ details.numbers table{margin-top:8px}
       <div class="chart" id="cWeek"></div>
       <details class="numbers"><summary>Show numbers</summary><div class="tablewrap"><table class="rtable" id="nWeek"></table></div></details>
     </div>
-    <div class="rpanel">
-      <h2>Denials</h2><p class="rp-sub">Newest first. Names are under Visits.</p>
+    <details class="rpanel r-fold" id="pDen">
+      <summary><span class="rf-h"><h2>Denials <span class="rf-n" id="denCount"></span></h2><span class="rp-sub" id="denSub">Newest first. Names are under Visits.</span></span><span class="rf-tog" aria-hidden="true"></span></summary>
       <div class="tablewrap"><table class="rtable" id="tDenials"></table></div>
       <button class="btn-plain" id="denMore" style="margin-top:12px" hidden></button>
-    </div>
+    </details>
   </div>
 </section>
 
@@ -880,7 +892,7 @@ const BAN_REASONS = [
   ['other', 'Other']
 ];
 
-const APP_VERSION = '1.4';
+const APP_VERSION = '1.5';
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const DEDUPE_MS = 120000; // same card again within 2 minutes is counted once
 const BAN_WAIT_MS = 1500; // how long a scan waits on the ban list before showing
@@ -1768,6 +1780,9 @@ $$('#viewReports .seg button').forEach(b => b.addEventListener('click', () => {
 }));
 $('#rStore').addEventListener('change', e => { R.store = e.target.value; drawReports(); });
 $('#denMore').addEventListener('click', () => { R.allDenials = !R.allDenials; drawReports(); });
+// Denials start folded up; each computer remembers whether a manager left them open.
+$('#pDen').open = !!ls.get('denOpen', false);
+$('#pDen').addEventListener('toggle', () => ls.set('denOpen', $('#pDen').open));
 
 function rangeDates(key) {
   const today = C.startOfDay(new Date());
@@ -1874,10 +1889,15 @@ function drawReports() {
   docs.forEach(d => (d.denials || []).forEach(x => den.push(Object.assign({ day: d.day, store: d.store }, x))));
   den.sort((a, b) => (b.at || 0) - (a.at || 0));
   const shownDen = R.allDenials ? den.slice(0, 500) : den.slice(0, 25);
+  const byReason = {}; den.forEach(x => { byReason[x.reason] = (byReason[x.reason] || 0) + 1; });
+  $('#denCount').textContent = den.length.toLocaleString();
+  $('#denSub').textContent = den.length
+    ? Object.keys(byReason).sort((a, b) => byReason[b] - byReason[a]).map(k => byReason[k].toLocaleString() + ' ' + ({ expired: 'expired', under_age: 'under 21', banned: 'banned' }[k] || REASON[k] || k)).join(' · ') + '. Newest first. Names are under Visits.'
+    : 'None in this range.';
   $('#denMore').hidden = den.length <= 25;
   $('#denMore').textContent = R.allDenials ? 'Show fewer' : 'Show all ' + den.length.toLocaleString() + (den.length > 500 ? ' (first 500)' : '');
   $('#tDenials').innerHTML = den.length ? '<thead><tr><th>Date</th><th>Time</th><th>Store</th><th>Station</th><th>Reason</th><th class="num">Age</th><th>ID from</th></tr></thead><tbody>' +
-    shownDen.map(x => `<tr><td>${fmtDay(x.day)}</td><td>${esc(x.time)}</td><td>${esc(storeName(x.store))}</td><td>${esc(x.station)}</td><td>${esc(REASON[x.reason] || x.reason)}</td><td class="num">${x.age == null ? '' : x.age}</td><td>${esc(issuerLabel(x.issuer))}</td></tr>`).join('') + '</tbody>'
+    shownDen.map(x => `<tr><td>${fd(x.day)}</td><td>${esc(x.time)}</td><td>${esc(storeName(x.store))}</td><td>${esc(x.station)}</td><td>${esc(REASON[x.reason] || x.reason)}</td><td class="num">${x.age == null ? '' : x.age}</td><td>${esc(issuerLabel(x.issuer))}</td></tr>`).join('') + '</tbody>'
     : '<tbody><tr><td class="empty">No denials in this range.</td></tr></tbody>';
 }
 
