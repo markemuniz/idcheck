@@ -892,7 +892,7 @@ const BAN_REASONS = [
   ['other', 'Other']
 ];
 
-const APP_VERSION = '1.5';
+const APP_VERSION = '1.5.1';
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const DEDUPE_MS = 120000; // same card again within 2 minutes is counted once
 const BAN_WAIT_MS = 1500; // how long a scan waits on the ban list before showing
@@ -983,7 +983,7 @@ function tones(freqs, dur, type, vol) {
 const SOUND = { clear: () => tones([784, 1175], .13, 'sine', .28), deny: () => tones([196, 196, 196], .2, 'square', .12), check: () => tones([523, 523], .15, 'triangle', .3) };
 
 /* ---------------- status + focus ---------------- */
-const Scan = { active: false, buf: '', timer: 0, alt: '' };
+const Scan = { active: false, buf: '', timer: 0, alt: '', t0: 0, last: 0, n: 0 };
 function refreshStatus() {
   const st = $('#status'), focused = document.hasFocus();
   $('#focusbar').hidden = focused;
@@ -1053,8 +1053,9 @@ document.addEventListener('keydown', e => {
       }
       if (inField(document.activeElement) && k !== '@') return;
     }
-    Scan.active = true; Scan.buf = ''; Scan.alt = ''; refreshStatus();
+    Scan.active = true; Scan.buf = ''; Scan.alt = ''; Scan.t0 = performance.now(); Scan.n = 0; refreshStatus();
   }
+  Scan.last = performance.now(); Scan.n++;
   e.preventDefault(); e.stopPropagation();
   if (altDigit) Scan.alt += e.code.slice(6);
   else if (e.ctrlKey && !e.altKey) {
@@ -1077,16 +1078,36 @@ document.addEventListener('keyup', e => {
   }
 }, true);
 function finishScan() {
-  const raw = Scan.buf;
+  const raw = Scan.buf, n = Scan.n, gap = n > 1 ? (Scan.last - Scan.t0) / (n - 1) : Infinity;
   Scan.active = false; Scan.buf = ''; Scan.alt = ''; refreshStatus();
-  if (raw.replace(/\s/g, '').length < 16) return; // a stray keypress, not a scan
+  // Short input: a stray keypress, unless it came in at scanner speed. A
+  // small barcode (an inventory or license number barcode) is short, and
+  // dropping it silently looked like the scanner did nothing.
+  const scannerSpeed = n >= 4 && gap < 60;
+  if (raw.replace(/\s/g, '').length < 16 && !scannerSpeed) return;
   $$('dialog').forEach(d => d.open && d.close());
-  handleRaw(raw, 'scan');
+  handleRaw(raw, 'scan').catch(scanFailed);
+}
+/* A scan must never end in a blank screen. If anything breaks while
+   reading one, say so, so staff rescan or check the card by hand. */
+function scanFailed(err) {
+  console.error('ID Check scan failed', err);
+  const msg = String((err && err.message) || err || 'unknown').slice(0, 120);
+  const v = { status: 'check', miss: true, reason: 'error', main: 'SCAN AGAIN', sub: 'Something went wrong', flags: [], age: null,
+    head: "Couldn't finish reading that ID", why: 'Scan it again. If it keeps happening, check the printed card or use Manual check, and tell a manager.' };
+  try { showResult({ recognized: false, flags: [], name: {} }, v, 'Error: ' + msg, '', ++scanSeq); }
+  catch (e2) {
+    try {
+      $('#page').dataset.state = 'check'; $('#idle').hidden = true; $('#result').hidden = false;
+      $('#sMain').textContent = v.main; $('#sSub').textContent = v.sub; $('#rHead').textContent = v.head; $('#rReason').textContent = v.why;
+      $('#rNote').textContent = 'Error: ' + msg;
+    } catch (e3) {}
+  }
 }
 document.addEventListener('paste', e => {
   if (inField(document.activeElement)) return;
   const txt = (e.clipboardData || window.clipboardData).getData('text');
-  if (txt && txt.length > 16) { e.preventDefault(); handleRaw(txt, 'paste'); }
+  if (txt && txt.length > 16) { e.preventDefault(); handleRaw(txt, 'paste').catch(scanFailed); }
 });
 
 /* ---------------- result screen ---------------- */
@@ -1460,11 +1481,11 @@ const samples = C.makeSamples(new Date());
 $('#samples').innerHTML = samples.map((s, i) => `<button type="button" data-sample="${i}">${esc(s.label)}</button>`).join('');
 $('#samples').addEventListener('click', e => {
   const b = e.target.closest('[data-sample]'); if (!b) return;
-  $('#dlgSettings').close(); handleRaw(samples[+b.dataset.sample].raw, 'sample');
+  $('#dlgSettings').close(); handleRaw(samples[+b.dataset.sample].raw, 'sample').catch(scanFailed);
 });
 $('#pasteGo').addEventListener('click', () => {
   const t = $('#pasteBox').value; if (!t.trim()) return;
-  $('#dlgSettings').close(); $('#pasteBox').value = ''; handleRaw(t, 'paste');
+  $('#dlgSettings').close(); $('#pasteBox').value = ''; handleRaw(t, 'paste').catch(scanFailed);
 });
 let resetArmed = false;
 $('#resetTally').addEventListener('click', e => {
