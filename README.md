@@ -14,6 +14,12 @@ Every barcode scan is saved as a visit. Managers sign in with Google to:
 
 Bans match the ID number and also the name and birth date, so a new license number still gets caught. Store computers sign a manager out after 15 idle minutes.
 
+Signing out is a full sign-out, since store computers are shared:
+
+- **Google**: clicking Sign out also signs the browser out of every Google account (a small Google window opens for a few seconds, so allow pop-ups for the page). After the 15-minute automatic sign-out, the next Sign in click finishes the Google sign-out first. Either way, getting back in takes a password.
+- **Saved data**: the manager data Firebase kept in the browser (visit names, bans, reports) is wiped once every scan has synced. If another ID Check tab is open, the wipe waits until the page is reloaded with only one tab open.
+- **Sign in** always asks which Google account to use.
+
 ## Privacy
 
 - **Visits** (managers only): name, age, sex, height, eye color, issuing state, last 4 of the ID number, store, station, time and result. Kept until deleted.

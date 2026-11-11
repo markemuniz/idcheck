@@ -892,11 +892,13 @@ const BAN_REASONS = [
   ['other', 'Other']
 ];
 
-const APP_VERSION = '1.5.1';
+const APP_VERSION = '1.6.0';
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const DEDUPE_MS = 120000; // same card again within 2 minutes is counted once
 const BAN_WAIT_MS = 1500; // how long a scan waits on the ban list before showing
 const MGR_IDLE_MS = 15 * 60000; // store computers sign managers out after 15 idle minutes
+const GOOGLE_LOGOUT_URL = 'https://accounts.google.com/Logout'; // signs the browser out of every Google account
+const GOOGLE_OUT_MS = 4000; // how long the Google sign-out window stays open
 const KEY_SALT = 'tta-idcheck-v1';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -1086,8 +1088,10 @@ function finishScan() {
   const scannerSpeed = n >= 4 && gap < 60;
   if (raw.replace(/\s/g, '').length < 16 && !scannerSpeed) return;
   $$('dialog').forEach(d => d.open && d.close());
-  handleRaw(raw, 'scan').catch(scanFailed);
+  scansBusy++;
+  handleRaw(raw, 'scan').catch(scanFailed).finally(() => { scansBusy--; });
 }
+let scansBusy = 0; // scans still being checked (the cache wipe waits for these)
 /* A scan must never end in a blank screen. If anything breaks while
    reading one, say so, so staff rescan or check the card by hand. */
 function scanFailed(err) {
@@ -1342,7 +1346,7 @@ function record(r, v, method, keys) {
 }
 
 /* ---------------- Firebase ---------------- */
-const cloud = { state: 'off', fs: null, au: null, db: null, auth: null, user: null, inflight: 0, err: '' };
+const cloud = { state: 'off', fs: null, au: null, app: null, db: null, auth: null, user: null, inflight: 0, err: '' };
 let pending = ls.get('pending', []);
 function enqueue(entry) { pending.push(entry); ls.set('pending', pending); flush(); }
 function flush() {
@@ -1350,7 +1354,7 @@ function flush() {
   while (pending.length) {
     const e = pending.shift(); ls.set('pending', pending);
     cloud.inflight++;
-    writeEntry(e).then(() => { cloud.inflight--; cloud.err = ''; renderCloud(); })
+    writeEntry(e).then(() => { cloud.inflight--; cloud.err = ''; renderCloud(); if (!cloud.inflight) wipeManagerCache(); })
       .catch(err => { cloud.inflight--; cloud.err = (err && err.code) || 'save failed'; console.warn('ID Check save failed', err); renderCloud(); });
   }
   renderCloud();
@@ -1395,20 +1399,48 @@ function renderCloud() {
   el.dataset.s = s; el.textContent = txt;
   const cl = $('#cloudLine'); if (cl) cl.textContent = txt + '.';
 }
-window.addEventListener('online', flush);
+window.addEventListener('online', () => { flush(); wipeManagerCache(); });
+// Offline cache, so scans made while the internet is down still save later.
+function makeDb(app) {
+  const fs = cloud.fs;
+  try { return fs.initializeFirestore(app, { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) }); }
+  catch (e) { return fs.getFirestore(app); }
+}
+/* Firestore keeps a copy of what managers looked at (visit names, bans,
+   reports) in this browser's storage. After a manager signs out, wipe it,
+   but only once every scan has reached Firebase, so no scan is lost. */
+let wiping = false, wipeBlocked = false;
+async function wipeManagerCache() {
+  if (wiping || wipeBlocked || !ls.get('wipeCache', false) || !cloud.db || !cloud.app) return;
+  if (!cloud.user || !cloud.user.isAnonymous) return; // nobody signed in yet, or a manager is back
+  if (pending.length || cloud.inflight || scansBusy || Scan.active || !navigator.onLine) return; // try again later
+  wiping = true;
+  const { fs } = cloud, db = cloud.db;
+  try {
+    const synced = await Promise.race([fs.waitForPendingWrites(db).then(() => true), new Promise(res => setTimeout(() => res(false), 8000))]);
+    if (!synced || pending.length || cloud.inflight || scansBusy || Scan.active || !cloud.user || !cloud.user.isAnonymous) return;
+    cloud.db = null; // new scans wait in the queue for the few moments this takes
+    await fs.terminate(db);
+    try { await fs.clearIndexedDbPersistence(db); ls.set('wipeCache', false); }
+    catch (e) { wipeBlocked = true; console.warn('ID Check: saved manager data will be wiped once other ID Check tabs are closed', e); }
+    cloud.db = makeDb(cloud.app);
+  } catch (e) {
+    console.warn('ID Check cache wipe failed', e);
+    if (!cloud.db) cloud.db = makeDb(cloud.app);
+  } finally { wiping = false; flush(); }
+}
 async function initCloud() {
   if (!FIREBASE_CONFIG) { renderCloud(); renderManagerView(); return; }
   try {
     const [appM, fs, au] = await Promise.all([import(SDK + 'firebase-app.js'), import(SDK + 'firebase-firestore.js'), import(SDK + 'firebase-auth.js')]);
     const app = appM.initializeApp(FIREBASE_CONFIG);
-    let db;
-    try { db = fs.initializeFirestore(app, { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) }); }
-    catch (e) { db = fs.getFirestore(app); }
-    Object.assign(cloud, { fs, au, db, auth: au.getAuth(app), state: 'on' });
+    cloud.fs = fs;
+    const db = makeDb(app);
+    Object.assign(cloud, { fs, au, app, db, auth: au.getAuth(app), state: 'on' });
     au.onAuthStateChanged(cloud.auth, user => {
       cloud.user = user;
       if (!user) au.signInAnonymously(cloud.auth).catch(err => { cloud.state = 'error'; cloud.err = err.code || 'sign-in failed'; renderCloud(); });
-      else { cloud.state = 'on'; flush(); }
+      else { cloud.state = 'on'; flush(); wipeManagerCache(); }
       renderCloud(); renderManagerView();
     });
   } catch (err) {
@@ -1523,7 +1555,12 @@ const isManager = u => !!(u && !u.isAnonymous && u.email && MANAGER_EMAILS.map(x
 function gate(title, text, signIn, signOut) {
   Object.values(VIEW_EL).forEach(s => { $(s).hidden = true; });
   $('#viewGate').hidden = false;
-  $('#gTitle').textContent = title; $('#gText').textContent = text;
+  const busy = !!(signIn && googleOutWin), gOut = signIn && !busy && ls.get('googleOut', false);
+  $('#gTitle').textContent = title;
+  $('#gText').textContent = busy ? 'Signing this browser out of Google…'
+    : gOut ? 'The last manager was signed out of ID Check, but this browser may still be signed in to their Google account. Finish signing it out, then sign in with your own account.' : text;
+  $('#gSignIn').textContent = gOut || busy ? 'Finish signing out of Google' : 'Sign in with Google';
+  $('#gSignIn').disabled = busy;
   $('#gSignIn').hidden = !signIn; $('#gSignOut').hidden = !signOut;
 }
 function renderManagerView() {
@@ -1540,12 +1577,62 @@ function renderManagerView() {
   if (v === 'reports') loadReports(); else if (v === 'visits') loadVisits(); else loadBans();
 }
 $('#gSignIn').addEventListener('click', async () => {
-  try { await cloud.au.signInWithPopup(cloud.auth, new cloud.au.GoogleAuthProvider()); mgrTouch(); }
+  // After an automatic sign-out the browser can still be signed in to the
+  // last manager's Google account. Sign that out first, so getting back in
+  // takes a password.
+  if (ls.get('googleOut', false)) {
+    if (!googleSignOut()) $('#gText').textContent = 'The browser blocked the Google sign-out window. Allow pop-ups for this page and try again.';
+    return;
+  }
+  try {
+    const provider = new cloud.au.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' }); // always ask which account
+    await cloud.au.signInWithPopup(cloud.auth, provider); mgrTouch();
+  }
   catch (err) { $('#gText').textContent = 'Sign-in didn’t finish (' + (err.code || 'error') + '). Try again.'; }
 });
-async function signOutMgr() { try { await cloud.au.signOut(cloud.auth); } catch (e) {} BX.at = 0; BX.list = []; BX.keys = new Map(); VS.rows = []; }
-$('#gSignOut').addEventListener('click', signOutMgr);
-$$('[data-signout]').forEach(b => b.addEventListener('click', signOutMgr));
+/* Signing out of Google needs a click: browsers block pop-ups otherwise.
+   Opens Google's sign-out page in a small window, then closes it. */
+let googleOutWin = null;
+function googleSignOut() {
+  let w = null;
+  try { w = window.open(GOOGLE_LOGOUT_URL, 'ttaGoogleOut', 'popup,width=440,height=520'); } catch (e) {}
+  if (!w) return false;
+  googleOutWin = w;
+  if (!isManager(cloud.user)) renderManagerView();
+  setTimeout(() => {
+    try { w.close(); } catch (e) {}
+    if (googleOutWin === w) googleOutWin = null;
+    ls.set('googleOut', false);
+    renderManagerView();
+    toast('Signed out of Google on this computer.');
+  }, GOOGLE_OUT_MS);
+  return true;
+}
+// Clear what managers had on screen and in memory.
+function clearManagerScreens() {
+  BX.at = 0; BX.list = []; BX.keys = new Map(); VS.rows = []; PV.row = null; PV.rows = []; R.docs = []; R.loadedKey = '';
+  ['#vList', '#bList', '#pList', '#banWho'].forEach(s => { const el = $(s); if (el) el.innerHTML = ''; });
+  ['#dlgPerson', '#dlgBan', '#dlgLift'].forEach(s => { const d = $(s); if (d && d.open) d.close(); });
+  $$('.mgrEmail').forEach(el => { el.textContent = ''; });
+}
+/* Full sign-out: out of ID Check, out of Google (right away when a manager
+   clicks Sign out; on the next Sign in click after an automatic sign-out),
+   and the manager data saved in this browser gets wiped. */
+async function signOutMgr(clicked) {
+  ls.set('googleOut', true); ls.set('wipeCache', true); wipeBlocked = false;
+  const googleOk = clicked === true && googleSignOut(); // open the window before anything async, while the click still counts
+  clearManagerScreens();
+  try {
+    await cloud.au.signOut(cloud.auth);
+    if (cloud.user && !cloud.user.isAnonymous) cloud.user = null; // don't redraw manager pages before Firebase reports the sign-out
+  } catch (e) { console.warn('ID Check sign-out failed', e); }
+  clearManagerScreens();
+  if (clicked === true && !googleOk) toast('Signed out of ID Check. Allow pop-ups for this page so it can sign out of Google too.');
+  renderManagerView();
+}
+$('#gSignOut').addEventListener('click', () => signOutMgr(true));
+$$('[data-signout]').forEach(b => b.addEventListener('click', () => signOutMgr(true)));
 // Store computers are shared, so a manager left signed in gets signed out
 // after 15 minutes without using Visits, Bans or Reports.
 let mgrLast = Date.now();
@@ -1554,6 +1641,7 @@ function mgrTouch() { mgrLast = Date.now(); }
 setInterval(() => {
   const u = cloud.user;
   if (u && !u.isAnonymous && S.store && Date.now() - mgrLast > MGR_IDLE_MS) { signOutMgr(); if (viewName() !== 'scan') location.hash = ''; }
+  else wipeManagerCache(); // retry a wipe that had to wait
 }, 30000);
 
 function toast(msg) {
