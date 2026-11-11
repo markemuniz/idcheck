@@ -4,6 +4,14 @@ A license and state ID scanner for The Travel Agency's four stores: SoHo, Union 
 
 Plug a 2D barcode scanner that reads PDF417 into the computer, open the page, and scan the back of the ID. The page shows CLEARED, UNDER 21, EXPIRED, CHECK ID or BANNED. It reads every US state, DC, US territory and Canadian province.
 
+## Passports
+
+Scan the 2 lines of text at the bottom of the passport photo page (the machine-readable zone). ID Check also reads the 3-line text on passport cards and foreign ID cards. It reads the name, birth date, expiration date, nationality and passport number, and checks the built-in check digits, so a misread asks for a rescan instead of clearing anyone. Passport scans count, save visits and check bans the same way license scans do.
+
+The scanner has to read OCR-B text, which is off by default. On a Zebra scanner (CS6080 and others), open the OCR Programming chapter of its Product Reference Guide and scan **Enable OCR-B**, then **OCR-B Passport** (or **ICAO Travel Documents**, if the guide lists it). Licenses keep scanning normally. Test it by scanning a passport into Notepad: two lines starting with `P<` should come out.
+
+Reports count passports under the passport country (for example "Passport, United States"). Passports don't show a home state, so they're left out of "Out of state".
+
 ## Visits and bans
 
 Every barcode scan is saved as a visit. Managers sign in with Google to:
@@ -22,7 +30,7 @@ Signing out is a full sign-out, since store computers are shared:
 
 ## Privacy
 
-- **Visits** (managers only): name, age, sex, height, eye color, issuing state, last 4 of the ID number, store, station, time and result. Kept until deleted.
+- **Visits** (managers only): name, age, sex, height, eye color, issuing state or passport country, last 4 of the ID or passport number, store, station, time and result. Kept until deleted.
 - **Scan counts** (Reports): age, result, reason, issuing state, store, station and time. No names.
 - **Home ZIP counts** (Reports map): how many scans came from each 5-digit ZIP code, per store per day. The ZIP is never saved with a scan or a visit.
 - **Never saved**: birth dates, full ID numbers and street addresses. Visits and bans hold a one-way fingerprint of the ID number and of name plus birth date, so they can be matched later without storing the numbers.

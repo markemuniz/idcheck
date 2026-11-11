@@ -334,8 +334,8 @@ details.numbers table{margin-top:8px}
     <div class="idle" id="idle">
       <svg class="barcode" id="barcodeArt" viewBox="0 0 360 92" aria-hidden="true"></svg>
       <h2 class="idle-title">Scan the back of the ID</h2>
-      <p class="idle-sub">Aim the scanner at the wide barcode on the back of the license or state ID.</p>
-      <p class="idle-note">No barcode, or it won't scan? Passports, military IDs, IDNYC and consular IDs go through <button class="linkish" data-open="manual">Manual check</button>.</p>
+      <p class="idle-sub">Aim the scanner at the wide barcode on the back of the license or state ID. Passport: scan the 2 lines of text under the photo.</p>
+      <p class="idle-note">No barcode, or it won't scan? Military IDs, IDNYC and consular IDs go through <button class="linkish" data-open="manual">Manual check</button>.</p>
     </div>
     <div class="result" id="result" hidden>
       <div class="stamp" id="stamp"><span id="sMain"></span><span class="s-sub" id="sSub"></span></div>
@@ -432,7 +432,7 @@ details.numbers table{margin-top:8px}
     <div class="rgrid">
       <div class="rpanel" id="pDays"><h2>Scans per day</h2><p class="rp-sub">Every scan and manual check</p><div id="lDays"></div><div class="chart" id="cDays"></div><details class="numbers"><summary>Show numbers</summary><div class="tablewrap"><table class="rtable" id="nDays"></table></div></details></div>
       <div class="rpanel"><h2>Busiest hours</h2><p class="rp-sub">Scans by hour of day, all days in range</p><div class="chart" id="cHours"></div><details class="numbers"><summary>Show numbers</summary><div class="tablewrap"><table class="rtable" id="nHours"></table></div></details></div>
-      <div class="rpanel"><h2>Where IDs are from</h2><p class="rp-sub">Issuing state or province</p><div id="cIssuers"></div></div>
+      <div class="rpanel"><h2>Where IDs are from</h2><p class="rp-sub">Issuing state, province or passport country</p><div id="cIssuers"></div></div>
       <div class="rpanel"><h2>Customer ages</h2><p class="rp-sub">Age at time of scan</p><div class="chart" id="cAges"></div><details class="numbers"><summary>Show numbers</summary><div class="tablewrap"><table class="rtable" id="nAges"></table></div></details></div>
     </div>
     <div class="rpanel" id="pWeek">
@@ -575,6 +575,7 @@ details.numbers table{margin-top:8px}
     <section>
       <h3>Scanner setup</h3>
       <p class="hint">The scanner has to be a 2D imager that reads PDF417, the wide barcode on the back of licenses. It types like a keyboard, so this page must stay open and clicked.</p>
+      <p class="hint">Passports: the scanner also needs OCR-B turned on. On a Zebra scanner, scan <b>Enable OCR-B</b>, then <b>OCR-B Passport</b> (or <b>ICAO Travel Documents</b>, if listed) from the OCR Programming chapter of its Product Reference Guide.</p>
       <label class="check"><input type="checkbox" id="setRaw"> Show the raw scan next to results (for troubleshooting)</label>
       <p class="hint">Try a sample ID. Samples aren't counted or saved.</p>
       <div class="samples" id="samples"></div>
@@ -692,8 +693,127 @@ var IDCore = (function () {
     return { first: first, middle: middle, last: last, suffix: suffix };
   }
 
+  /* ---------- Passports and other travel IDs ----------
+     The 2 or 3 lines of text at the bottom of a passport photo page (the
+     MRZ, ICAO 9303). Scanners with OCR-B turned on type them in like a
+     barcode. Passports use 2 lines of 44 (TD3), ID cards 3 lines of 30
+     (TD1) or 2 lines of 36 (TD2). Check digits catch misreads. */
+  // ISO 3166 alpha-3 to alpha-2, for country names
+  var A3 = {}; 'ABWAW AFGAF AGOAO AIAAI ALAAX ALBAL ANDAD AREAE ARGAR ARMAM ASMAS ATAAQ ATFTF ATGAG AUSAU AUTAT AZEAZ BDIBI BELBE BENBJ BESBQ BFABF BGDBD BGRBG BHRBH BHSBS BIHBA BLMBL BLRBY BLZBZ BMUBM BOLBO BRABR BRBBB BRNBN BTNBT BVTBV BWABW CAFCF CANCA CCKCC CHECH CHLCL CHNCN CIVCI CMRCM CODCD COGCG COKCK COLCO COMKM CPVCV CRICR CUBCU CUWCW CXRCX CYMKY CYPCY CZECZ DEUDE DJIDJ DMADM DNKDK DOMDO DZADZ ECUEC EGYEG ERIER ESHEH ESPES ESTEE ETHET FINFI FJIFJ FLKFK FRAFR FROFO FSMFM GABGA GBRGB GEOGE GGYGG GHAGH GIBGI GINGN GLPGP GMBGM GNBGW GNQGQ GRCGR GRDGD GRLGL GTMGT GUFGF GUMGU GUYGY HKGHK HMDHM HNDHN HRVHR HTIHT HUNHU IDNID IMNIM INDIN IOTIO IRLIE IRNIR IRQIQ ISLIS ISRIL ITAIT JAMJM JEYJE JORJO JPNJP KAZKZ KENKE KGZKG KHMKH KIRKI KNAKN KORKR KWTKW LAOLA LBNLB LBRLR LBYLY LCALC LIELI LKALK LSOLS LTULT LUXLU LVALV MACMO MAFMF MARMA MCOMC MDAMD MDGMG MDVMV MEXMX MHLMH MKDMK MLIML MLTMT MMRMM MNEME MNGMN MNPMP MOZMZ MRTMR MSRMS MTQMQ MUSMU MWIMW MYSMY MYTYT NAMNA NCLNC NERNE NFKNF NGANG NICNI NIUNU NLDNL NORNO NPLNP NRUNR NZLNZ OMNOM PAKPK PANPA PCNPN PERPE PHLPH PLWPW PNGPG POLPL PRIPR PRKKP PRTPT PRYPY PSEPS PYFPF QATQA REURE ROURO RUSRU RWARW SAUSA SDNSD SENSN SGPSG SGSGS SHNSH SJMSJ SLBSB SLESL SLVSV SMRSM SOMSO SPMPM SRBRS SSDSS STPST SURSR SVKSK SVNSI SWESE SWZSZ SXMSX SYCSC SYRSY TCATC TCDTD TGOTG THATH TJKTJ TKLTK TKMTM TLSTL TONTO TTOTT TUNTN TURTR TUVTV TWNTW TZATZ UGAUG UKRUA UMIUM URYUY USAUS UZBUZ VATVA VCTVC VENVE VGBVG VIRVI VNMVN VUTVU WLFWF WSMWS YEMYE ZAFZA ZMBZM ZWEZW'.split(' ').forEach(function (x) { A3[x.slice(0, 3)] = x.slice(3); });
+  var ICAO_NAMES = { D: 'Germany', GBD: 'United Kingdom (overseas territories)', GBN: 'United Kingdom (national overseas)',
+    GBO: 'United Kingdom (overseas citizen)', GBP: 'United Kingdom (protected person)', GBS: 'United Kingdom (subject)',
+    RKS: 'Kosovo', EUE: 'European Union', UNO: 'United Nations', UNA: 'United Nations', UNK: 'Kosovo (UN)',
+    XXA: 'Stateless', XXB: 'Refugee', XXC: 'Refugee', XXX: 'Unspecified nationality', XOM: 'Sovereign Order of Malta', XPO: 'Interpol' };
+  var regionNames = null;
+  try { regionNames = new Intl.DisplayNames(['en'], { type: 'region' }); } catch (e) {}
+  function countryName(c) {
+    c = String(c || '').replace(/</g, '').toUpperCase();
+    if (ICAO_NAMES[c]) return ICAO_NAMES[c];
+    var a2 = A3[c];
+    if (a2 && regionNames) { try { return regionNames.of(a2) || c; } catch (e) {} }
+    return c || 'Unknown country';
+  }
+  var MRZ_HEAD = /^[PIACV][A-Z0-9<][A-Z<]{3}/;
+  function mrzCD(s) {
+    var w = [7, 3, 1], t = 0;
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      t += (c >= 48 && c <= 57 ? c - 48 : c >= 65 && c <= 90 ? c - 55 : 0) * w[i % 3];
+    }
+    return t % 10;
+  }
+  function cdOK(s, d) { return d != null && /^[0-9<]$/.test(d) && (d === '<' ? 0 : +d) === mrzCD(s); }
+  function mrzFlat(text) { return normalize(text).toUpperCase().replace(/\s+/g, ''); }
+  // Lines from the scanner. Use its line breaks when it sends them, otherwise cut by length.
+  function mrzSplit(text) {
+    var lines = normalize(text).toUpperCase().split('\n').map(function (x) { return x.replace(/\s+/g, ''); }).filter(Boolean);
+    var all = lines.join('');
+    if (!MRZ_HEAD.test(all) || all.indexOf('<') < 0 || all.length < 30) return null;
+    if (/[^A-Z0-9<]/.test(all)) return { fmt: null, lines: lines };
+    var L = lines.map(function (x) { return x.length; }).join(',');
+    if (L === '44,44') return { fmt: 'TD3', lines: lines };
+    if (L === '30,30,30') return { fmt: 'TD1', lines: lines };
+    if (L === '36,36') return { fmt: 'TD2', lines: lines };
+    function cut(n) { var o = []; for (var i = 0; i < all.length; i += n) o.push(all.slice(i, i + n)); return o; }
+    if (all.length === 88) return { fmt: 'TD3', lines: cut(44) };
+    if (all.length === 90) return { fmt: 'TD1', lines: cut(30) };
+    if (all.length === 72) return { fmt: 'TD2', lines: cut(36) };
+    return { fmt: null, lines: lines };
+  }
+  // YYMMDD. Birth dates later than this year's YY are 19YY. Expiration
+  // dates are 20YY unless that's over 50 years out (an old 19YY card).
+  function mrzDate(s, kind) {
+    if (!/^\d{6}$/.test(s)) return null;
+    var yy = +s.slice(0, 2), m = +s.slice(2, 4), d = +s.slice(4, 6), cy = new Date().getFullYear() % 100;
+    var y = kind === 'dob' ? (yy > cy ? 1900 + yy : 2000 + yy) : (yy > cy + 50 ? 1900 + yy : 2000 + yy);
+    if (m < 1 || m > 12 || d < 1 || d > new Date(y, m, 0).getDate()) return null;
+    return new Date(y, m - 1, d);
+  }
+  function mrzName(f) {
+    var parts = String(f || '').replace(/<+$/, '').split('<<');
+    var last = (parts[0] || '').replace(/</g, ' ').trim();
+    var given = parts.slice(1).join(' ').replace(/</g, ' ').trim().split(/\s+/).filter(Boolean);
+    return { first: given.shift() || '', middle: given.join(' '), last: last, suffix: '' };
+  }
+  function analyzeMRZ(text) {
+    var s = mrzSplit(text);
+    if (!s) return null;
+    var r = { recognized: false, mrz: true, fields: {}, flags: [], fallback: false, version: null, iin: null, issuer: null,
+      name: { first: '', middle: '', last: '', suffix: '' } };
+    if (s.lines[0] && s.lines[0][0] === 'V') { r.mrzVisa = true; return r; } // a visa sticker, not the passport
+    if (!s.fmt) { r.mrzBad = true; return r; }
+    var l = s.lines, p;
+    if (s.fmt === 'TD1') {
+      p = { code: l[0].slice(0, 2), state: l[0].slice(2, 5), num: l[0].slice(5, 14), numCD: l[0][14],
+        dob: l[1].slice(0, 6), dobCD: l[1][6], sex: l[1][7], exp: l[1].slice(8, 14), expCD: l[1][14], nat: l[1].slice(15, 18),
+        comp: l[1][29], compData: l[0].slice(5, 30) + l[1].slice(0, 7) + l[1].slice(8, 15) + l[1].slice(18, 29), name: l[2] };
+      if (p.numCD === '<') { // number longer than 9: it runs on into the next field, check digit last
+        var run = /^[A-Z0-9]+/.exec(l[0].slice(15));
+        if (run && run[0].length >= 2) { p.num += run[0].slice(0, -1); p.numCD = run[0].slice(-1); }
+      }
+    } else {
+      var n = s.fmt === 'TD3' ? 44 : 36;
+      p = { code: l[0].slice(0, 2), state: l[0].slice(2, 5), name: l[0].slice(5), num: l[1].slice(0, 9), numCD: l[1][9],
+        nat: l[1].slice(10, 13), dob: l[1].slice(13, 19), dobCD: l[1][19], sex: l[1][20], exp: l[1].slice(21, 27), expCD: l[1][27],
+        comp: l[1][n - 1], compData: l[1].slice(0, 10) + l[1].slice(13, 20) + l[1].slice(21, n - 1) };
+      if (s.fmt === 'TD3') { p.opt = l[1].slice(28, 42); p.optCD = l[1][42]; }
+    }
+    var bad = [];
+    if (!cdOK(p.num, p.numCD)) bad.push('number');
+    if (!cdOK(p.dob, p.dobCD)) bad.push('birth date');
+    if (!cdOK(p.exp, p.expCD)) bad.push('expiration');
+    if (p.opt != null && !cdOK(p.opt, p.optCD)) bad.push('personal number');
+    if (!cdOK(p.compData, p.comp)) bad.push('overall');
+    if (bad.length) { r.mrzBad = true; r.mrzBadFields = bad; return r; }
+
+    var st = p.state.replace(/</g, ''), nat = p.nat.replace(/</g, ''), num = p.num.replace(/</g, '');
+    var book = s.fmt === 'TD3' && p.code[0] === 'P', pcard = !book && p.code[0] === 'P';
+    r.recognized = true; r.fmt = s.fmt; r.found = 10;
+    r.docCode = book ? 'passport' : pcard ? 'passport_card' : 'travel_id';
+    r.docType = book ? 'Passport' : pcard ? 'Passport card' : 'ID card';
+    r.issuer = { name: countryName(st), abbr: (book || pcard ? 'PP_' : 'TD_') + st, country: st };
+    r.country = st; r.nationality = nat;
+    r.fields = { DAQ: num };
+    r.dob = mrzDate(p.dob, 'dob'); r.exp = mrzDate(p.exp, 'exp'); r.issued = null; r.under21Until = null;
+    r.name = mrzName(p.name);
+    r.sex = p.sex === 'M' ? 'Male' : p.sex === 'F' ? 'Female' : p.sex === 'X' ? 'X' : '';
+    r.eyes = ''; r.height = ''; r.idLast4 = num.slice(-4); r.realId = null; r.limited = false; r.state = ''; r.zip5 = '';
+    r.cardKey = hash('mrz|' + st + '|' + num + '|' + p.dob + '|' + r.name.last);
+    if (!/<$/.test(p.name)) r.flags.push({ level: 'warn', code: 'name_cut', text: 'The name fills the whole line, so it may be cut short. Check the name printed above it.' });
+    return r;
+  }
+  // While a scan is coming in: is this passport text, and is all of it here?
+  function mrzProgress(raw) {
+    var all = mrzFlat(raw);
+    if (!MRZ_HEAD.test(all) || all.indexOf('<') < 0) return null;
+    var r = analyzeMRZ(raw);
+    if (r && (r.recognized || r.mrzVisa)) return { done: true };
+    return all.length < 90 ? { pending: true } : null;
+  }
+
   function analyze(raw) {
     var text = normalize(raw);
+    if (!/(?:ANSI|AAMVA) ?\d{8}/.test(text)) { var mz = analyzeMRZ(text); if (mz) return mz; }
     var r = { recognized: false, fields: {}, flags: [], fallback: false, version: null, iin: null, issuer: null };
     var hm = /(?:ANSI|AAMVA) ?(\d{6})(\d{2})/.exec(text);
     var pos = 0, designators = [], i;
@@ -794,7 +914,7 @@ var IDCore = (function () {
     var v = { flags: r.flags.slice(), age: null };
     function out(o) { for (var k in o) v[k] = o[k]; return v; }
     if (!r.recognized) return out({ status: 'check', reason: 'unreadable', main: 'CHECK ID', sub: 'No ID data found',
-      head: "This isn't a license or state ID barcode", why: 'Passports, military IDs, IDNYC and consular IDs go through Manual check.' });
+      head: "This isn't a license or state ID barcode", why: 'For a passport, scan the 2 lines of text under the photo. Military IDs, IDNYC and consular IDs go through Manual check.' });
     if (!r.dob) return out({ status: 'check', reason: 'no_dob', main: 'CHECK ID', sub: 'No birth date',
       head: 'No birth date in the barcode', why: 'Check the birth date printed on the card, or use Manual check.' });
     var age = ageOn(r.dob, t); v.age = age;
@@ -835,6 +955,22 @@ var IDCore = (function () {
         ['DAG', '100 SAMPLE ST'], ['DAI', o.city], ['DAJ', o.st], ['DAK', o.zip], ['DAQ', o.id], ['DCF', 'SAMPLE' + o.id.slice(-4)],
         ['DCG', 'USA'], ['DDE', 'N'], ['DDF', 'N'], ['DDG', 'N'], ['DDA', 'F'], ['DDJ', US(o.ddj || addYears(o.dob, 21))]];
     }
+    // Passport text: TD3 is 2 lines of 44, TD1 is 3 lines of 30.
+    function yymmdd(d) { return pad2(d.getFullYear() % 100) + pad2(d.getMonth() + 1) + pad2(d.getDate()); }
+    function fill(x, n) { return (x + new Array(n + 1).join('<')).slice(0, n); }
+    function nm(o) { return o.last.replace(/ /g, '<') + '<<' + o.first.replace(/ /g, '<'); }
+    function td3(o) {
+      var l1 = fill('P<' + o.st + nm(o), 44), num = fill(o.num, 9), dob = yymmdd(o.dob), exp = yymmdd(o.exp), opt = fill(o.opt || '', 14);
+      var l2 = num + mrzCD(num) + (o.nat || o.st) + dob + mrzCD(dob) + (o.sex || 'M') + exp + mrzCD(exp) + opt + mrzCD(opt);
+      return l1 + '\r' + l2 + mrzCD(l2.slice(0, 10) + l2.slice(13, 20) + l2.slice(21, 43)) + '\r';
+    }
+    function td1(o) {
+      var num = fill(o.num, 9), l1 = fill(o.code + o.st.padEnd(3, '<') + num + mrzCD(num), 30), dob = yymmdd(o.dob), exp = yymmdd(o.exp);
+      var l2 = fill(dob + mrzCD(dob) + (o.sex || 'F') + exp + mrzCD(exp) + (o.nat || o.st).padEnd(3, '<'), 29);
+      l2 += mrzCD(l1.slice(5, 30) + l2.slice(0, 7) + l2.slice(8, 15) + l2.slice(18, 29));
+      return l1 + '\r' + l2 + '\r' + fill(nm(o), 30) + '\r';
+    }
+    var usPass = { st: 'USA', last: 'MORALES', first: 'DANA MARIE', num: '573829164', dob: sh(-29, -64), exp: sh(7, 15), sex: 'F' };
     var ny = { last: 'RIVERA', first: 'JORDAN', mid: 'ALEX', dob: sh(-34, -47), exp: sh(4, 120), iss: sh(-4, 120), city: 'NEW YORK', st: 'NY', zip: '100120000', id: '123456789' };
     return [
       { label: 'New York, 34 years old', raw: build('636001', '09', 'DL', std(ny)) },
@@ -845,12 +981,17 @@ var IDCore = (function () {
       { label: 'Texas, 2000 format', raw: build('636015', '01', 'DL', [['DAQ', '12345678'], ['DAA', 'GARCIA,SAM,J'], ['DAG', '9 SAMPLE LN'], ['DAI', 'AUSTIN'], ['DAJ', 'TX'], ['DAK', '78701'], ['DBA', CA(sh(1, 200))], ['DBB', CA(sh(-41, -3))], ['DBC', 'M'], ['DBD', CA(sh(-5, 200))], ['DAU', '5-11']], true) },
       { label: 'Scanner with no line breaks', raw: build('636001', '09', 'DL', std(ny)).replace(/[\n\r\x1e]/g, '') },
       { label: 'Altered barcode data', raw: build('636001', '09', 'DL', std({ last: 'SMITH', first: 'CASEY', dob: sh(-30, -10), exp: sh(3, 0), iss: sh(-2, 0), city: 'BROOKLYN', st: 'NY', zip: '112170000', id: '987654321', ddj: sh(0, 200) })) },
+      { label: 'Passport, United States', raw: td3(usPass) },
+      { label: 'Passport, United Kingdom, 20 years old', raw: td3({ st: 'GBR', last: 'OKAFOR', first: 'DANIEL', num: '120384756', dob: sh(-20, -75), exp: sh(9, 0), sex: 'M' }) },
+      { label: 'ID card, Germany (3 lines)', raw: td1({ code: 'ID', st: 'D', last: 'WEBER', first: 'LENA', num: 'L01X00T47', dob: sh(-26, -5), exp: sh(6, 30), sex: 'F' }) },
+      { label: 'Passport misread', raw: td3(usPass).replace(/(\r[A-Z0-9<]{13}\d{5})\d/, function (m, a) { return a + ((+m.slice(-1) + 3) % 10); }) },
       { label: "Not an ID", raw: 'TTA-LOYALTY-0001234567' }
     ];
   }
 
   return { analyze: analyze, verdict: verdict, parseDate: parseDate, parseTyped: parseTyped, makeSamples: makeSamples,
-    fmt: fmt, ageOn: ageOn, addYears: addYears, startOfDay: startOfDay, daysBetween: daysBetween, IIN: IIN, BY_ABBR: BY_ABBR };
+    fmt: fmt, ageOn: ageOn, addYears: addYears, startOfDay: startOfDay, daysBetween: daysBetween, IIN: IIN, BY_ABBR: BY_ABBR,
+    countryName: countryName, mrzProgress: mrzProgress };
 })();
 /*CORE-END*/
 </script>
@@ -892,7 +1033,7 @@ const BAN_REASONS = [
   ['other', 'Other']
 ];
 
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.7.0';
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const DEDUPE_MS = 120000; // same card again within 2 minutes is counted once
 const BAN_WAIT_MS = 1500; // how long a scan waits on the ban list before showing
@@ -1040,7 +1181,8 @@ function inField(el) {
 function anyDialogOpen() { return $$('dialog').some(d => d.open); }
 function arm() {
   clearTimeout(Scan.timer);
-  const p = scanProgress(Scan.buf);
+  // Passport text has no header, but its check digits say when all of it is in.
+  const p = scanProgress(Scan.buf) || C.mrzProgress(Scan.buf);
   Scan.timer = setTimeout(finishScan, !p ? IDLE_MS : p.done ? DONE_MS : PARTIAL_MS);
 }
 document.addEventListener('keydown', e => {
@@ -1142,11 +1284,20 @@ async function handleRaw(raw, source) {
   if (viewName() !== 'scan') location.hash = '';
   const seq = ++scanSeq;
   const r = C.analyze(raw);
+  // Passport text that didn't pass its check digits is almost always a
+  // misread (glare, a bent page). Ask for a rescan instead of counting it.
+  if (r.mrz && !r.recognized) {
+    showResult(r, { status: 'check', miss: true, reason: r.mrzVisa ? 'mrz_visa' : 'mrz_misread', main: 'SCAN AGAIN', sub: r.mrzVisa ? 'That was a visa' : 'Passport misread', flags: [], age: null,
+      head: r.mrzVisa ? 'That was the visa, not the passport' : "Couldn't read the passport cleanly",
+      why: r.mrzVisa ? 'Scan the 2 lines of text at the bottom of the passport photo page.' : 'Hold the photo page flat and still, out of direct light, and scan the 2 lines of text again. Still failing? Use Manual check.' },
+      'Not counted.' + (r.mrzBadFields ? ' Check digits that failed: ' + r.mrzBadFields.join(', ') + '.' : ''), raw, seq);
+    return;
+  }
   // A short barcode that isn't ID data (a store tag, the small barcode on
   // some cards): ask for a rescan instead of counting it as flagged.
   if (!r.recognized && raw.replace(/\s/g, '').length < 150) {
     showResult(r, { status: 'check', miss: true, reason: 'wrong_barcode', main: 'TRY AGAIN', sub: 'Wrong barcode', flags: [], age: null,
-      head: "That wasn't the ID barcode", why: 'Aim at the wide barcode on the back of the license or state ID. No barcode, or it won’t scan? Use Manual check.' }, 'Not counted.', raw, seq);
+      head: "That wasn't the ID barcode", why: 'Aim at the wide barcode on the back of the license or state ID, or the 2 lines of text under a passport photo. No barcode, or it won’t scan? Use Manual check.' }, 'Not counted.', raw, seq);
     return;
   }
   let v = C.verdict(r, { minAge: S.minAge, today: new Date() });
@@ -1196,10 +1347,11 @@ function showResult(r, v, note, raw, seq) {
   }
   if (!r.manual && r.recognized) {
     rows.push(['Issued by', r.issuer ? r.issuer.name : (r.state || 'Unknown'), [r.docType, r.realId === true ? 'REAL ID' : r.realId === false ? 'Not REAL ID' : '', r.limited ? 'Limited term' : ''].filter(Boolean).join(', ')]);
+    if (r.mrz && r.nationality && r.nationality !== r.country) rows.push(['Nationality', C.countryName(r.nationality), '']);
     if (r.issued) rows.push(['Issued', C.fmt(r.issued), '']);
     const desc = [r.sex, r.height, r.eyes ? r.eyes + ' eyes' : ''].filter(Boolean).join(', ');
     if (desc) rows.push(['Description', desc, '']);
-    if (r.idLast4) rows.push(['ID number', 'Ends in ' + r.idLast4, '']);
+    if (r.idLast4) rows.push([r.docType === 'Passport' ? 'Passport number' : 'ID number', 'Ends in ' + r.idLast4, '']);
   }
   if (r.manual) rows.push(['Checked', 'By hand', 'Dates typed in by staff']);
   $('#facts').innerHTML = v.miss ? '' : rows.map(([k, val, sub]) => `<dt>${esc(k)}</dt><dd>${esc(val)}${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</dd>`).join('');
@@ -1722,7 +1874,7 @@ function drawVisits() {
     ? 'Last names starting with “' + find + '”, ' + where + ', any date: ' + n + (VS.rows.length >= 400 ? ' (first 400, type more of the name)' : '')
     : new Date(VS.day + 'T12:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' }) + ', ' + where + ': ' + n;
   if (!rows.length) {
-    $('#vList').innerHTML = `<li class="empty">${find ? 'Nobody by that last name.' : 'No visits saved for this day.'} Only barcode scans are saved as visits, not manual checks.</li>`;
+    $('#vList').innerHTML = `<li class="empty">${find ? 'Nobody by that last name.' : 'No visits saved for this day.'} Only scanned IDs and passports are saved as visits, not manual checks.</li>`;
     return;
   }
   let html = '', lastHour = null;
@@ -1929,7 +2081,12 @@ const pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '–';
 const fmtDay = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
 const hourLbl = h => { h = +h; return (h % 12 || 12) + (h < 12 ? 'a' : 'p'); };
 const REASON = { under_age: 'Under 21', expired: 'Expired ID', banned: 'Banned' };
-const issuerLabel = k => k === 'manual' ? 'Manual check (no barcode)' : k === 'unknown' ? 'Unrecognized' : (C.BY_ABBR[k] || k);
+// Scanned passports and travel IDs are counted as PP_ or TD_ plus the country code (PP_USA).
+const travelKey = k => /^(PP|TD)_[A-Z]{1,3}$/.test(k);
+const issuerLabel = k => k === 'manual' ? 'Manual check (no barcode)' : k === 'unknown' ? 'Unrecognized'
+  : travelKey(k) ? (k[0] === 'P' ? 'Passport, ' : 'ID card, ') + C.countryName(k.slice(3)) : (C.BY_ABBR[k] || k);
+// Passports don't say what state someone lives in, so "out of state" leaves them out.
+const travelCount = iss => Object.keys(iss).reduce((a, k) => a + (travelKey(k) ? n0(iss[k]) : 0), 0);
 
 function drawReports() {
   const { days, start, end } = rangeDates(R.range);
@@ -1948,7 +2105,7 @@ function drawReports() {
     const sd = R.docs.filter(d => d.store === s.id);
     const res = sumMap(sd, 'result'), rea = sumMap(sd, 'reason'), iss = sumMap(sd, 'issuer');
     const t = sd.reduce((a, d) => a + n0(d.total), 0);
-    const barcode = t - n0(iss.manual);
+    const barcode = t - n0(iss.manual) - travelCount(iss); // scans that show a home state
     return { s, t, clear: n0(res.clear), under: n0(rea.under_age), expired: n0(rea.expired), flagged: n0(res.check), oos: barcode - n0(iss[HOME_STATE]) - n0(iss.unknown), barcode, manual: n0(iss.manual) };
   });
   const tot = rows.reduce((a, r) => { ['t', 'clear', 'under', 'expired', 'flagged', 'oos', 'barcode', 'manual'].forEach(k => a[k] += r[k]); return a; }, { t: 0, clear: 0, under: 0, expired: 0, flagged: 0, oos: 0, barcode: 0, manual: 0 });
@@ -2053,7 +2210,7 @@ $('#rCsv').addEventListener('click', () => {
   const docs = R.docs.filter(d => R.store === 'all' || d.store === R.store).sort((a, b) => (a.day + a.store).localeCompare(b.day + b.store));
   const head = ['date', 'store', 'scans', 'cleared', 'denied_under_21', 'denied_expired', 'flagged', 'manual_checks', 'out_of_state'];
   const lines = [head.join(',')].concat(docs.map(d => {
-    const iss = d.issuer || {}, man = n0(iss.manual), bc = n0(d.total) - man;
+    const iss = d.issuer || {}, man = n0(iss.manual), bc = n0(d.total) - man - travelCount(iss);
     return [d.day, storeName(d.store), n0(d.total), n0((d.result || {}).clear), n0((d.reason || {}).under_age), n0((d.reason || {}).expired), n0((d.result || {}).check), man, bc - n0(iss[HOME_STATE]) - n0(iss.unknown)].map(v => /[",]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : v).join(',');
   }));
   const url = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
